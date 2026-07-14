@@ -325,12 +325,13 @@ class PluginAlpreportTemplateProcessor
     }
 
     /**
-     * Build the per-placeholder Word table XML map. These placeholders, when found
-     * in a paragraph, replace the entire enclosing <w:p>...</w:p> with a real Word
-     * table. Recognized placeholders:
-     *   {{components}}, {{software}}, {{network_ports}}, {{rack_items}}.
+     * Build the per-placeholder Word table data map. These placeholders, when
+     * found in a paragraph, replace the entire enclosing <w:p>...</w:p> with a
+     * real Word table. The actual <w:tbl> XML is built at render time so each
+     * cell can inherit the run properties (font, size, color, bold, ...) of
+     * the original placeholder run.
      *
-     * @return array<string,string> placeholder => raw <w:tbl> xml
+     * @return array<string,array{headers:string[],rows:array<int,string[]>}>
      */
     public static function buildBlockMap(CommonDBTM $item): array
     {
@@ -352,10 +353,10 @@ class PluginAlpreportTemplateProcessor
             }
         }
         if (!empty($compRows)) {
-            $blocks['{{components}}'] = self::buildWordTable(
-                ['Type', 'Name', 'Manufacturer', 'Serial', 'Inventory #'],
-                $compRows
-            );
+            $blocks['{{components}}'] = [
+                'headers' => ['Type', 'Name', 'Manufacturer', 'Serial', 'Inventory #'],
+                'rows'    => $compRows,
+            ];
         }
 
         // Software inventory.
@@ -369,10 +370,10 @@ class PluginAlpreportTemplateProcessor
                     (string)($sw['serial'] ?? ''),
                 ];
             }
-            $blocks['{{software}}'] = self::buildWordTable(
-                ['Software', 'Version', 'License Serial'],
-                $swRows
-            );
+            $blocks['{{software}}'] = [
+                'headers' => ['Software', 'Version', 'License Serial'],
+                'rows'    => $swRows,
+            ];
         }
 
         // Network ports.
@@ -389,10 +390,10 @@ class PluginAlpreportTemplateProcessor
                     (string)($row['vlan'] ?? ''),
                 ];
             }
-            $blocks['{{network_ports}}'] = self::buildWordTable(
-                ['#', 'Name', 'Type', 'MAC', 'IP', 'VLAN'],
-                $portRows
-            );
+            $blocks['{{network_ports}}'] = [
+                'headers' => ['#', 'Name', 'Type', 'MAC', 'IP', 'VLAN'],
+                'rows'    => $portRows,
+            ];
         }
 
         // Rack items (when asset is a Rack).
@@ -409,10 +410,10 @@ class PluginAlpreportTemplateProcessor
                         (string)($row['location'] ?? ''),
                     ];
                 }
-                $blocks['{{rack_items}}'] = self::buildWordTable(
-                    ['Position', 'Orientation', 'Type', 'Name', 'Location'],
-                    $rackRows
-                );
+                $blocks['{{rack_items}}'] = [
+                    'headers' => ['Position', 'Orientation', 'Type', 'Name', 'Location'],
+                    'rows'    => $rackRows,
+                ];
             }
         }
 
@@ -424,10 +425,14 @@ class PluginAlpreportTemplateProcessor
      * Borders are inlined so the output renders correctly even when the host
      * document has no TableGrid style defined.
      *
+     * The optional $rPrXml argument is the raw <w:rPr>...</w:rPr> XML extracted
+     * from the placeholder's run; when supplied, every cell's text run receives
+     * those properties so the table inherits the placeholder's font/size/color.
+     *
      * @param string[]   $headers
      * @param string[][] $rows
      */
-    private static function buildWordTable(array $headers, array $rows): string
+    private static function buildWordTable(array $headers, array $rows, string $rPrXml = ''): string
     {
         $colCount = max(1, count($headers));
 
@@ -446,7 +451,24 @@ class PluginAlpreportTemplateProcessor
 
         $tblGrid = '<w:tblGrid>' . str_repeat('<w:gridCol/>', $colCount) . '</w:tblGrid>';
 
-        $renderCell = static function (string $text, bool $bold, bool $shaded): string {
+        // Build a per-run rPr that combines the placeholder's properties with
+        // an extra <w:b/> for the header row. Properties are merged by
+        // appending <w:b/> to the inner content of the existing <w:rPr>.
+        $baseInner = '';
+        if ($rPrXml !== '' && preg_match('/<w:rPr\b[^>]*>(.*?)<\/w:rPr>/s', $rPrXml, $m)) {
+            $baseInner = $m[1];
+        } elseif (preg_match('/<w:rPr\b[^>]*\/>/', $rPrXml) === 1) {
+            $baseInner = '';
+        }
+        $bodyRPr   = $baseInner !== '' ? '<w:rPr>' . $baseInner . '</w:rPr>' : '';
+        // Header row: inherited props + bold (don't duplicate <w:b/> if already present).
+        $headerInner = $baseInner;
+        if (strpos($headerInner, '<w:b/>') === false && strpos($headerInner, '<w:b ') === false) {
+            $headerInner .= '<w:b/>';
+        }
+        $headerRPr = '<w:rPr>' . $headerInner . '</w:rPr>';
+
+        $renderCell = static function (string $text, string $cellRPr, bool $shaded): string {
             $escaped = htmlspecialchars($text, ENT_XML1 | ENT_COMPAT, 'UTF-8');
             // Convert embedded newlines to Word line breaks.
             if (strpos($escaped, "\n") !== false) {
@@ -459,15 +481,14 @@ class PluginAlpreportTemplateProcessor
             $shading = $shaded
                 ? '<w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="E6E6E6"/></w:tcPr>'
                 : '<w:tcPr/>';
-            $rPr = $bold ? '<w:rPr><w:b/></w:rPr>' : '';
             return '<w:tc>' . $shading
-                . '<w:p><w:r>' . $rPr . '<w:t xml:space="preserve">' . $escaped . '</w:t></w:r></w:p>'
+                . '<w:p><w:r>' . $cellRPr . '<w:t xml:space="preserve">' . $escaped . '</w:t></w:r></w:p>'
                 . '</w:tc>';
         };
 
         $headerRow = '<w:tr><w:trPr><w:tblHeader/></w:trPr>';
         foreach ($headers as $h) {
-            $headerRow .= $renderCell((string)$h, true, true);
+            $headerRow .= $renderCell((string)$h, $headerRPr, true);
         }
         $headerRow .= '</w:tr>';
 
@@ -475,7 +496,7 @@ class PluginAlpreportTemplateProcessor
         foreach ($rows as $row) {
             $bodyRows .= '<w:tr>';
             for ($i = 0; $i < $colCount; $i++) {
-                $bodyRows .= $renderCell((string)($row[$i] ?? ''), false, false);
+                $bodyRows .= $renderCell((string)($row[$i] ?? ''), $bodyRPr, false);
             }
             $bodyRows .= '</w:tr>';
         }
@@ -487,8 +508,9 @@ class PluginAlpreportTemplateProcessor
      * Render a DOCX file using the placeholder map and return a temp file path.
      *
      * @param array<string,string> $placeholderMap key (e.g. "{{asset_name}}") => replacement string
-     * @param array<string,string> $blockMap       key => raw OOXML block (e.g. <w:tbl>) that
-     *                                             replaces the entire enclosing <w:p> when found
+     * @param array<string,array{headers:string[],rows:array<int,string[]>}> $blockMap
+     *        key => structured table data; the entire enclosing <w:p> is replaced
+     *        with a Word table whose runs inherit the placeholder's <w:rPr>.
      */
     public static function renderDocx($templatePath, array $placeholderMap, array $blockMap = [])
     {
@@ -572,16 +594,41 @@ class PluginAlpreportTemplateProcessor
                 $xml = self::repairSplitPlaceholders($xml);
 
                 // First, replace block placeholders: when a paragraph contains one of
-                // these, the entire <w:p>...</w:p> is swapped out for a Word table (or
-                // any raw block-level OOXML the caller provides).
+                // these, the entire <w:p>...</w:p> is swapped out for a Word table
+                // whose runs inherit the placeholder's <w:rPr> (font, size, color).
                 if (!empty($blockMap)) {
-                    foreach ($blockMap as $blockKey => $blockXml) {
+                    foreach ($blockMap as $blockKey => $blockData) {
                         $needle = preg_quote($blockKey, '/');
                         $pattern = '/<w:p\b[^>]*>(?:(?!<\/w:p>).)*?' . $needle . '(?:(?!<\/w:p>).)*?<\/w:p>/su';
-                        $replaced = preg_replace($pattern, $blockXml, $xml, 1);
-                        if ($replaced !== null) {
-                            $xml = $replaced;
-                        }
+
+                        $xml = preg_replace_callback(
+                            $pattern,
+                            static function ($m) use ($blockKey, $blockData) {
+                                $paragraphXml = $m[0];
+
+                                // Locate the <w:r> that contains the placeholder and
+                                // extract its <w:rPr> so the table inherits the
+                                // placeholder's font / size / color / bold / italic.
+                                $rPrXml = '';
+                                $runPattern = '/<w:r\b[^>]*>(?:(?!<\/w:r>).)*?'
+                                    . preg_quote($blockKey, '/')
+                                    . '(?:(?!<\/w:r>).)*?<\/w:r>/su';
+                                if (preg_match($runPattern, $paragraphXml, $rm)) {
+                                    if (preg_match('/<w:rPr\b[^>]*>.*?<\/w:rPr>|<w:rPr\b[^>]*\/>/s', $rm[0], $pm)) {
+                                        $rPrXml = $pm[0];
+                                    }
+                                }
+
+                                return self::buildWordTable(
+                                    $blockData['headers'] ?? [],
+                                    $blockData['rows'] ?? [],
+                                    $rPrXml
+                                );
+                            },
+                            $xml,
+                            1
+                        );
+
                         // Also strip the placeholder key from the scalar map so any
                         // leftover occurrences (outside a paragraph context, unlikely)
                         // don't end up as a literal "{{components}}" string.
