@@ -428,3 +428,95 @@ INSERT IGNORE INTO glpi_items_softwarelicenses (id, items_id, itemtype, software
 INSERT IGNORE INTO glpi_items_racks (itemtype, items_id, racks_id, position, orientation) VALUES
 ('Computer', 201, 200, 10, 1),
 ('NetworkEquipment', 200, 201, 5, 1);
+
+-- Monitor Manufacturers (in addition to Dell already defined)
+INSERT IGNORE INTO glpi_manufacturers (id, name) VALUES 
+(210, 'LG Electronics'),
+(211, 'BenQ'),
+(212, 'ViewSonic');
+
+-- Monitor Types
+INSERT IGNORE INTO glpi_monitortypes (id, name) VALUES
+(200, 'LCD'),
+(201, 'LED'),
+(202, 'IPS');
+
+-- Monitor Models
+INSERT IGNORE INTO glpi_monitormodels (id, name) VALUES
+(200, 'UltraSharp U2720Q'),
+(201, '27UK850-W'),
+(202, 'PD2700U'),
+(203, 'E248W-1920');
+
+-- Monitors
+INSERT IGNORE INTO glpi_monitors (
+    id, entities_id, name, serial, otherserial, comment, 
+    locations_id, states_id, manufacturers_id, monitormodels_id, monitortypes_id,
+    size, have_micro, have_speaker, have_subd, have_bnc, have_dvi, have_pivot,
+    have_hdmi, have_displayport,
+    users_id, users_id_tech,
+    date_creation, date_mod
+) VALUES
+(200, @entity_id, 'Dell U2720Q #1', 'MON-SN-200', 'MON-INV-200', 'Primary monitor for WS-TEST-001', 
+    200, 200, 200, 200, 202,
+    27, 0, 1, 0, 0, 1, 1,
+    1, 1,
+    200, 203,
+    NOW(), NOW()),
+(201, @entity_id, 'Dell U2720Q #2', 'MON-SN-201', 'MON-INV-201', 'Secondary monitor for WS-TEST-001', 
+    200, 200, 200, 200, 202,
+    27, 0, 1, 0, 0, 1, 1,
+    1, 1,
+    200, 203,
+    NOW(), NOW()),
+(202, @entity_id, 'LG 27UK850', 'MON-SN-202', 'MON-INV-202', 'Monitor for PC-TEST-001', 
+    200, 200, 210, 201, 202,
+    27, 0, 1, 0, 0, 0, 1,
+    1, 1,
+    201, 203,
+    NOW(), NOW()),
+(203, @entity_id, 'BenQ PD2700U', 'MON-SN-203', 'MON-INV-203', 'Spare monitor', 
+    200, 202, 211, 202, 202,
+    27, 0, 0, 0, 0, 1, 1,
+    1, 1,
+    0, 203,
+    NOW(), NOW()),
+(204, @entity_id, 'ViewSonic E248W', 'MON-SN-204', 'MON-INV-204', 'Small office monitor', 
+    200, 200, 212, 203, 201,
+    24, 0, 1, 0, 0, 1, 0,
+    1, 0,
+    0, 203,
+    NOW(), NOW());
+
+-- Update monitors (in case they already exist)
+UPDATE glpi_monitors SET 
+    name = 'Dell U2720Q #1', 
+    users_id = 200, 
+    locations_id = 200,
+    states_id = 200
+WHERE id = 200;
+
+UPDATE glpi_monitors SET 
+    name = 'Dell U2720Q #2', 
+    users_id = 200, 
+    locations_id = 200,
+    states_id = 200
+WHERE id = 201;
+
+UPDATE glpi_monitors SET 
+    name = 'LG 27UK850', 
+    users_id = 201, 
+    locations_id = 200,
+    states_id = 200
+WHERE id = 202;
+
+-- Computer-Monitor connections via glpi_assets_assets_peripheralassets
+-- WS-TEST-001 (id=200) has 2 monitors (dual monitor setup)
+-- PC-TEST-001 (id=202) has 1 monitor
+-- SRV-TEST-001 (id=201) has no monitor (it's a server)
+INSERT IGNORE INTO glpi_assets_assets_peripheralassets (
+    id, itemtype_asset, items_id_asset, itemtype_peripheral, items_id_peripheral, is_deleted, is_dynamic
+) VALUES
+(200, 'Computer', 200, 'Monitor', 200, 0, 0),  -- WS-TEST-001 <-> Dell U2720Q #1
+(201, 'Computer', 200, 'Monitor', 201, 0, 0),  -- WS-TEST-001 <-> Dell U2720Q #2 (dual setup)
+(202, 'Computer', 202, 'Monitor', 202, 0, 0);  -- PC-TEST-001 <-> LG 27UK850
