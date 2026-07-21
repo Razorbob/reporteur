@@ -91,6 +91,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $asset = PluginAlpreportTemplateProcessor::resolveAsset($itemType, $itemId);
         $map = PluginAlpreportTemplateProcessor::buildPlaceholderMap($asset);
         $blockMap = PluginAlpreportTemplateProcessor::buildBlockMap($asset);
+        
+        // DEBUG MODE: Output collected data instead of generating DOCX
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Disposition: inline; filename="debug_data_' . date('Ymd_Hi') . '.txt"');
+        
+        echo "=== DEBUG OUTPUT - COLLECTED DATA MAPS ===\n\n";
+        echo "Generated at: " . date('Y-m-d H:i:s') . "\n";
+        echo "Template: " . basename($templatePath) . "\n";
+        echo "Item Type: " . $itemType . "\n";
+        echo "Item ID: " . $itemId . "\n\n";
+        
+        echo "=== PLACEHOLDER MAP ===\n";
+        echo "Count: " . count($map) . " placeholders\n\n";
+        foreach ($map as $key => $value) {
+            echo str_pad($key, 40) . " => " . (is_string($value) ? $value : json_encode($value, JSON_PRETTY_PRINT)) . "\n";
+        }
+        
+        echo "\n\n=== BLOCK MAP ===\n";
+        echo "Count: " . count($blockMap) . " blocks\n\n";
+        foreach ($blockMap as $blockKey => $blockData) {
+            echo "Block: " . $blockKey . "\n";
+            if (is_array($blockData)) {
+                echo json_encode($blockData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+            } else {
+                echo var_export($blockData, true) . "\n";
+            }
+            echo "\n";
+        }
+        
+        echo "\n=== END DEBUG OUTPUT ===\n";
+        exit;
+        
+        /* COMMENTED OUT - DOCX GENERATION AND DOWNLOAD
         $generatedPath = PluginAlpreportTemplateProcessor::renderDocx($templatePath, $map, $blockMap);
 
         if (!is_file($generatedPath) || filesize($generatedPath) === 0) {
@@ -138,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         exit;
+        END COMMENTED OUT - DOCX GENERATION AND DOWNLOAD */
         } // end else (generate)
     } catch (Throwable $e) {
         $errorMessage = $e->getMessage();
@@ -309,6 +347,7 @@ echo "<li><b>Network</b>: {{asset_ip}}, {{asset_mac}}</li>";
 echo "<li><b>Components (all)</b>: {{components}}</li>";
 echo "<li><b>Components per type</b>: {{components_processor}}, {{components_memory}}, {{components_harddrive}}, {{components_networkcard}}, {{components_graphiccard}}, {{components_soundcard}}, {{components_motherboard}}, {{components_powersupply}}, {{components_drive}}, {{components_control}}, {{components_case}}, {{components_pci}}, {{components_simcard}}, {{components_sensor}}, {{components_battery}}, {{components_firmware}}, {{components_generic}}, {{components_camera}}</li>";
 echo "<li><b>Component counts</b>: {{components_processor_count}}, {{components_memory_count}}, ...</li>";
+echo "<li><b>Connected peripherals (tables)</b>: {{monitors}}</li>";
 echo "<li><b>Any DB field</b>: {{field_<columnname>}} (e.g. {{field_contact}})</li>";
 echo "<li><b>Any FK</b>: {{hardware_<fieldname>_id}} or {{hardware_<fieldname>}} (resolved name)</li>";
 echo "<li><b>Misc</b>: {{generated_at}}</li>";
