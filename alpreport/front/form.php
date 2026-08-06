@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $templates = PluginAlpreportTemplateProcessor::listTemplates();
-$itemtypes = PluginAlpreportTemplateProcessor::SUPPORTED_ITEMTYPES;
+$assetTypes = PluginAlpreportTemplateProcessor::SUPPORTED_ASSET_TYPES;
 
 Html::header('Alp Report', $_SERVER['PHP_SELF'], 'tools', 'PluginAlpreportMenu');
 
@@ -189,39 +189,39 @@ echo "<input type='hidden' name='_glpi_csrf_token' value='" . htmlspecialchars(S
 echo "<table class='tab_cadre_fixe'>";
 echo "<tr><th colspan='2'>Generate from Template</th></tr>";
 
-// Itemtype + items_id picker.
+// Asset type + items_id picker.
 // To avoid relying on /ajax/dropdownAllItems.php (which has its own access checks
 // and IDOR/entity-restriction quirks), we render one items dropdown per supported
-// itemtype and toggle visibility from the itemtype selector using plain JS.
+// asset type and toggle visibility from the asset type selector using plain JS.
 echo "<tr><td>Asset</td><td>";
 
 $rand = mt_rand();
-$selectedItemtype = $_POST['itemtype'] ?? 'Computer';
-if (!in_array($selectedItemtype, $itemtypes, true)) {
-    $selectedItemtype = 'Computer';
+$selectedAssetType = $_POST['itemtype'] ?? 'Computer';
+if (!in_array($selectedAssetType, $assetTypes, true)) {
+    $selectedAssetType = 'Computer';
 }
 
-// Itemtype select.
-$itemtypeOptions = [];
-foreach ($itemtypes as $type) {
+// Asset type select. The posted field remains "itemtype" because GLPI APIs use itemtype values.
+$assetTypeOptions = [];
+foreach ($assetTypes as $type) {
     if ($obj = getItemForItemtype($type)) {
-        $itemtypeOptions[$type] = $obj->getTypeName(1);
+        $assetTypeOptions[$type] = $obj->getTypeName(1);
     }
 }
 $selectId = 'alpreport_itemtype_' . $rand;
 echo "<select id='" . htmlspecialchars($selectId, ENT_QUOTES) . "' name='itemtype' class='form-select' style='width:300px;display:inline-block;'>";
-foreach ($itemtypeOptions as $value => $label) {
-    $selAttr = $value === $selectedItemtype ? ' selected' : '';
+foreach ($assetTypeOptions as $value => $label) {
+    $selAttr = $value === $selectedAssetType ? ' selected' : '';
     echo "<option value='" . htmlspecialchars($value, ENT_QUOTES) . "'$selAttr>" . htmlspecialchars($label) . "</option>";
 }
 echo "</select>";
 
 echo "<br><br>";
 
-// One items_id picker per itemtype, hidden when not active.
-foreach ($itemtypes as $type) {
+// One items_id picker per asset type, hidden when not active.
+foreach ($assetTypes as $type) {
     $wrapperId = 'alpreport_items_wrapper_' . $type . '_' . $rand;
-    $isActive = ($type === $selectedItemtype);
+    $isActive = ($type === $selectedAssetType);
     echo "<span id='" . htmlspecialchars($wrapperId, ENT_QUOTES) . "' style='" . ($isActive ? '' : 'display:none;') . "'>";
     Dropdown::show($type, [
         'name'    => $isActive ? 'items_id' : ('items_id_' . $type),
@@ -233,16 +233,16 @@ foreach ($itemtypes as $type) {
 }
 
 // JS to toggle visibility + rename the active items_id field so only one is submitted.
-$itemtypesJson = json_encode($itemtypes);
+$assetTypesJson = json_encode($assetTypes);
 $randJson = json_encode($rand);
 echo Html::scriptBlock(<<<JS
 (function () {
-    var itemtypes = $itemtypesJson;
+    var assetTypes = $assetTypesJson;
     var rand = $randJson;
     var sel = document.getElementById('$selectId');
     function refresh() {
         var current = sel.value;
-        itemtypes.forEach(function (t) {
+        assetTypes.forEach(function (t) {
             var wrapper = document.getElementById('alpreport_items_wrapper_' + t + '_' + rand);
             if (!wrapper) { return; }
             var active = (t === current);
