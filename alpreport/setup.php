@@ -4,7 +4,7 @@
  * Plugin setup entrypoint.
  */
 
-define('PLUGIN_ALPREPORT_VERSION', '1.0.0');
+define('PLUGIN_ALPREPORT_VERSION', '1.2.0');
 
 function plugin_init_alpreport()
 {

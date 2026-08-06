@@ -546,16 +546,20 @@ INSERT IGNORE INTO glpi_printermodels (id, name) VALUES
 INSERT IGNORE INTO glpi_printers (
     id, entities_id, is_recursive, name, serial, otherserial, uuid, contact, contact_num, comment,
     locations_id, states_id, manufacturers_id, printermodels_id, printertypes_id,
+    have_serial, have_parallel, have_usb, have_wifi, have_ethernet,
     users_id, users_id_tech, is_global, is_deleted, is_template, date_creation, date_mod
 ) VALUES
 (200, @entity_id, 0, 'PRN-OFFICE-MFP-01', 'PRN-SN-200', 'PRN-INV-200', 'uuid-prn-200', 'Design Team', '+1-555-0301', 'Shared monochrome MFP in the main office copy area',
     200, 200, 220, 200, 200,
+    0, 0, 1, 0, 1,
     0, 203, 1, 0, 0, NOW(), NOW()),
 (201, @entity_id, 0, 'PRN-FINANCE-COLOR-01', 'PRN-SN-201', 'PRN-INV-201', 'uuid-prn-201', 'Finance Team', '+1-555-0302', 'Color laser printer for finance reports and invoices',
     200, 200, 221, 201, 201,
+    0, 0, 1, 1, 1,
     201, 203, 1, 0, 0, NOW(), NOW()),
 (202, @entity_id, 0, 'PRN-LABEL-01', 'PRN-SN-202', 'PRN-INV-202', 'uuid-prn-202', 'IT Ops', '+1-555-0303', 'Network label printer for asset tags and shipping labels',
     200, 201, 222, 202, 202,
+    0, 0, 1, 1, 1,
     203, 203, 1, 0, 0, NOW(), NOW());
 
 -- Update printers (in case they already exist)
@@ -571,6 +575,11 @@ UPDATE glpi_printers SET
     manufacturers_id = 220,
     printermodels_id = 200,
     printertypes_id = 200,
+    have_serial = 0,
+    have_parallel = 0,
+    have_usb = 1,
+    have_wifi = 0,
+    have_ethernet = 1,
     users_id_tech = 203,
     is_global = 1,
     is_deleted = 0
@@ -588,6 +597,11 @@ UPDATE glpi_printers SET
     manufacturers_id = 221,
     printermodels_id = 201,
     printertypes_id = 201,
+    have_serial = 0,
+    have_parallel = 0,
+    have_usb = 1,
+    have_wifi = 1,
+    have_ethernet = 1,
     users_id = 201,
     users_id_tech = 203,
     is_global = 1,
@@ -606,6 +620,11 @@ UPDATE glpi_printers SET
     manufacturers_id = 222,
     printermodels_id = 202,
     printertypes_id = 202,
+    have_serial = 0,
+    have_parallel = 0,
+    have_usb = 1,
+    have_wifi = 1,
+    have_ethernet = 1,
     users_id = 203,
     users_id_tech = 203,
     is_global = 1,

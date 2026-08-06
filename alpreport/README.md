@@ -84,6 +84,14 @@ You can also click **Download sample template** on the form page to get a ready-
 
 - `{{network_ports}}` — multi-line list (one port per line) with `#logical name [type] MAC=... IP=... VLAN=...`
 - `{{network_ports_count}}` — total port count
+- Row-table placeholders: `{{network_ports_name}}`, `{{network_ports_port_number}}`,
+  `{{network_ports_logical}}`, `{{network_ports_type}}`, `{{network_ports_mac}}`,
+  `{{network_ports_ip}}`, `{{network_ports_vlan}}`, `{{network_ports_speed}}`
+
+### Printer ports *(Printer only)*
+
+- Row-table placeholders: `{{printer_ports}}` — port name (`Serial`, `Parallel`, `USB`, `Wi-Fi`, `Ethernet`)
+- `{{printer_ports_available}}` — `Ja` when the corresponding `have_*` field is checked, otherwise `Nein`
 
 ### Rack mount *(when the asset is mounted in a rack)*
 

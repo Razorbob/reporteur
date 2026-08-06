@@ -201,13 +201,14 @@ class PluginAlpreportNetworkCollector
                     $result['lines'][] = implode(' ', $parts);
                 }
                 $result['rows'][] = [
-                    'logical' => (string)$logical,
-                    'name'    => $name,
-                    'type'    => $shortType,
-                    'mac'     => $mac,
-                    'ip'      => $ip,
-                    'vlan'    => $vlan,
-                    'speed'   => $speed,
+                    'logical'     => (string)$logical,
+                    'port_number' => (string)$logical,
+                    'name'        => $name,
+                    'type'        => $shortType,
+                    'mac'         => $mac,
+                    'ip'          => $ip,
+                    'vlan'        => $vlan,
+                    'speed'       => $speed,
                 ];
             }
         } catch (Throwable $e) {

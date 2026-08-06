@@ -47,9 +47,13 @@ class PluginAlpreportPlainTextPlaceholderBuilder
             }
         }
 
+        $aliasTables = self::assetAliasTables($item);
         foreach (self::assetAliases($item) as $alias => $fieldKey) {
             if (!empty($fields[$fieldKey]) && is_numeric($fields[$fieldKey])) {
                 $resolved = $resolveForeignKey($fieldKey, (int)$fields[$fieldKey]);
+                if ($resolved === null && isset($aliasTables[$alias])) {
+                    $resolved = self::dropdownName($aliasTables[$alias], (int)$fields[$fieldKey]);
+                }
                 if ($resolved !== null) {
                     $map['{{asset_' . $alias . '}}'] = $resolved;
                 }
@@ -95,6 +99,45 @@ class PluginAlpreportPlainTextPlaceholderBuilder
         }
 
         return $aliases;
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function assetAliasTables(CommonDBTM $item): array
+    {
+        $tables = [
+            'location'     => 'glpi_locations',
+            'state'        => 'glpi_states',
+            'manufacturer' => 'glpi_manufacturers',
+            'model'        => 'glpi_computermodels',
+            'type'         => 'glpi_computertypes',
+            'entity'       => 'glpi_entities',
+            'network'      => 'glpi_networks',
+            'domain'       => 'glpi_domains',
+        ];
+
+        if ($item instanceof NetworkEquipment) {
+            $tables['model'] = 'glpi_networkequipmentmodels';
+            $tables['type'] = 'glpi_networkequipmenttypes';
+            $tables['firmware'] = 'glpi_networkequipmentfirmwares';
+        }
+        if (class_exists('Rack') && $item instanceof Rack) {
+            $tables['model'] = 'glpi_rackmodels';
+            $tables['type'] = 'glpi_racktypes';
+        }
+        if (class_exists('Printer') && $item instanceof Printer) {
+            $tables['model'] = 'glpi_printermodels';
+            $tables['type'] = 'glpi_printertypes';
+        }
+
+        return $tables;
+    }
+
+    private static function dropdownName(string $table, int $id): ?string
+    {
+        $name = Dropdown::getDropdownName($table, $id);
+        return ($name && $name !== '&nbsp;') ? trim(strip_tags($name)) : null;
     }
 
     /**

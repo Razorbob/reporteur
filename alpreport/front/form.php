@@ -343,6 +343,8 @@ echo "<li><b>Asset</b>: {{asset_name}}, {{asset_serial}}, {{asset_otherserial}},
 echo "<li><b>Resolved dropdowns</b>: {{asset_location}}, {{asset_state}}, {{asset_manufacturer}}, {{asset_model}}, {{asset_type}}, {{asset_os}}, {{asset_group}}, {{asset_entity}}, {{asset_domain}}, {{asset_network}}</li>";
 echo "<li><b>User</b>: {{asset_user_name}}, {{asset_user_login}}, {{asset_user_realname}}, {{asset_user_email}}, {{asset_user_phone}}</li>";
 echo "<li><b>Network</b>: {{asset_ip}}, {{asset_mac}}</li>";
+echo "<li><b>Network port columns</b>: {{network_ports_name}}, {{network_ports_port_number}}, {{network_ports_logical}}, {{network_ports_type}}, {{network_ports_mac}}, {{network_ports_ip}}, {{network_ports_vlan}}, {{network_ports_speed}}</li>";
+echo "<li><b>Printer port columns</b>: {{printer_ports}}, {{printer_ports_available}} (Ja/Nein)</li>";
 echo "<li><b>Processor columns</b>: {{components_processor_manufacturer}}, {{components_processor_model}}, {{components_processor_cores}}, {{components_processor_frequency}}, {{components_processor_threads}}</li>";
 echo "<li><b>Memory columns</b>: {{components_memory_manufacturer}}, {{components_memory_model}}, {{components_memory_size}}, {{components_memory_frequency}}, {{components_memory_type}}</li>";
 echo "<li><b>Hard drive columns</b>: {{components_harddrive_manufacturer}}, {{components_harddrive_model}}, {{components_harddrive_size}}, {{components_harddrive_type}}</li>";

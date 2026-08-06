@@ -3,7 +3,7 @@
 class PluginAlpreportXmlRowTableRenderer
 {
     /**
-     * Expand row-based placeholders (components_* and monitors_*) into one row per item.
+     * Expand row-based placeholders into one row per item.
      *
      * @param array<string,array<int,array<string,string>>> $componentRowData
      */
@@ -18,13 +18,14 @@ class PluginAlpreportXmlRowTableRenderer
             static function (array $m) use ($componentRowData): string {
                 $rowXml = $m[0];
 
-                if (!preg_match_all('/\{\{(components_[a-z0-9]+|monitors)_([a-z0-9_]+)\}\}/i', $rowXml, $phMatches, PREG_SET_ORDER)) {
+                if (!preg_match_all('/\{\{(?:(components_[a-z0-9]+|monitors|network_ports)_([a-z0-9_]+)|(printer_ports)(?:_([a-z0-9_]+))?)\}\}/i', $rowXml, $phMatches, PREG_SET_ORDER)) {
                     return $rowXml;
                 }
 
-                $prefix = strtolower((string)$phMatches[0][1]);
+                $prefix = strtolower((string)($phMatches[0][1] ?: $phMatches[0][3]));
                 foreach ($phMatches as $ph) {
-                    if (strtolower((string)$ph[1]) !== $prefix) {
+                    $matchPrefix = strtolower((string)($ph[1] ?: $ph[3]));
+                    if ($matchPrefix !== $prefix) {
                         return $rowXml;
                     }
                 }
@@ -37,9 +38,12 @@ class PluginAlpreportXmlRowTableRenderer
                 $expandedRows = '';
                 foreach ($rows as $itemRow) {
                     $expandedRows .= preg_replace_callback(
-                        '/\{\{' . preg_quote($prefix, '/') . '_([a-z0-9_]+)\}\}/i',
-                        static function (array $pm) use ($itemRow): string {
-                            $column = strtolower((string)$pm[1]);
+                        '/\{\{' . preg_quote($prefix, '/') . '(?:_([a-z0-9_]+))?\}\}/i',
+                        static function (array $pm) use ($itemRow, $prefix): string {
+                            $column = strtolower((string)($pm[1] ?? ''));
+                            if ($column === '' && $prefix === 'printer_ports') {
+                                $column = 'ports';
+                            }
                             $value = (string)($itemRow[$column] ?? '');
                             return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
                         },

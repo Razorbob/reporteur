@@ -68,6 +68,8 @@ class PluginAlpreportPlaceholderRegistry
             'components_harddrive' => ['manufacturer', 'model', 'size', 'type'],
             'components_networkcard' => ['manufacturer', 'model', 'mac', 'flow'],
             'components_graphiccard' => ['manufacturer', 'model', 'memory', 'interface', 'comment'],
+            'network_ports' => ['logical', 'port_number', 'name', 'type', 'mac', 'ip', 'vlan', 'speed'],
+            'printer_ports' => ['available'],
             'monitors' => ['manufacturer', 'model', 'size', 'type', 'serial', 'serial_number'],
         ];
     }
@@ -82,6 +84,7 @@ class PluginAlpreportPlaceholderRegistry
             'software_serial' => '',
             'software_count' => '0',
             'monitors_count' => '0',
+            'printer_ports' => '',
         ];
     }
 }
