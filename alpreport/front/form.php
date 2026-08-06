@@ -91,44 +91,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $asset = PluginAlpreportTemplateProcessor::resolveAsset($itemType, $itemId);
         $map = PluginAlpreportTemplateProcessor::buildPlaceholderMap($asset);
         $blockMap = PluginAlpreportTemplateProcessor::buildBlockMap($asset);
+        $componentRowData = PluginAlpreportTemplateProcessor::buildComponentRowData($asset);
         
-        // DEBUG MODE: Output collected data instead of generating DOCX
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        header('Content-Type: text/plain; charset=utf-8');
-        header('Content-Disposition: inline; filename="debug_data_' . date('Ymd_Hi') . '.txt"');
-        
-        echo "=== DEBUG OUTPUT - COLLECTED DATA MAPS ===\n\n";
-        echo "Generated at: " . date('Y-m-d H:i:s') . "\n";
-        echo "Template: " . basename($templatePath) . "\n";
-        echo "Item Type: " . $itemType . "\n";
-        echo "Item ID: " . $itemId . "\n\n";
-        
-        echo "=== PLACEHOLDER MAP ===\n";
-        echo "Count: " . count($map) . " placeholders\n\n";
-        foreach ($map as $key => $value) {
-            echo str_pad($key, 40) . " => " . (is_string($value) ? $value : json_encode($value, JSON_PRETTY_PRINT)) . "\n";
-        }
-        
-        echo "\n\n=== BLOCK MAP ===\n";
-        echo "Count: " . count($blockMap) . " blocks\n\n";
-        foreach ($blockMap as $blockKey => $blockData) {
-            echo "Block: " . $blockKey . "\n";
-            if (is_array($blockData)) {
-                echo json_encode($blockData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
-            } else {
-                echo var_export($blockData, true) . "\n";
-            }
-            echo "\n";
-        }
-        
-        echo "\n=== END DEBUG OUTPUT ===\n";
-        exit;
-        
-        /* COMMENTED OUT - DOCX GENERATION AND DOWNLOAD
-        $generatedPath = PluginAlpreportTemplateProcessor::renderDocx($templatePath, $map, $blockMap);
+        $generatedPath = PluginAlpreportTemplateProcessor::render($templatePath, $map, $blockMap, $componentRowData);
 
         if (!is_file($generatedPath) || filesize($generatedPath) === 0) {
             @unlink($generatedPath);
@@ -175,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         exit;
-        END COMMENTED OUT - DOCX GENERATION AND DOWNLOAD */
+
         } // end else (generate)
     } catch (Throwable $e) {
         $errorMessage = $e->getMessage();
@@ -338,20 +303,25 @@ echo "</table>";
 echo "</form>";
 
 echo "<div style='max-width:820px;margin:14px auto;text-align:left;'>";
-echo "<h3>Available placeholders</h3>";
+echo "<h3>Available placeholders (v2 template)</h3>";
 echo "<ul>";
 echo "<li><b>Asset</b>: {{asset_name}}, {{asset_serial}}, {{asset_otherserial}}, {{asset_uuid}}, {{asset_comment}}, {{asset_contact}}, {{asset_contact_num}}, {{asset_date_creation}}, {{asset_date_mod}}</li>";
 echo "<li><b>Resolved dropdowns</b>: {{asset_location}}, {{asset_state}}, {{asset_manufacturer}}, {{asset_model}}, {{asset_type}}, {{asset_os}}, {{asset_group}}, {{asset_entity}}, {{asset_domain}}, {{asset_network}}</li>";
 echo "<li><b>User</b>: {{asset_user_name}}, {{asset_user_login}}, {{asset_user_realname}}, {{asset_user_email}}, {{asset_user_phone}}</li>";
 echo "<li><b>Network</b>: {{asset_ip}}, {{asset_mac}}</li>";
-echo "<li><b>Components (all)</b>: {{components}}</li>";
-echo "<li><b>Components per type</b>: {{components_processor}}, {{components_memory}}, {{components_harddrive}}, {{components_networkcard}}, {{components_graphiccard}}, {{components_soundcard}}, {{components_motherboard}}, {{components_powersupply}}, {{components_drive}}, {{components_control}}, {{components_case}}, {{components_pci}}, {{components_simcard}}, {{components_sensor}}, {{components_battery}}, {{components_firmware}}, {{components_generic}}, {{components_camera}}</li>";
-echo "<li><b>Component counts</b>: {{components_processor_count}}, {{components_memory_count}}, ...</li>";
-echo "<li><b>Connected peripherals (tables)</b>: {{monitors}}</li>";
+echo "<li><b>Processor columns</b>: {{components_processor_manufacturer}}, {{components_processor_model}}, {{components_processor_cores}}, {{components_processor_frequency}}, {{components_processor_threads}}</li>";
+echo "<li><b>Memory columns</b>: {{components_memory_manufacturer}}, {{components_memory_model}}, {{components_memory_size}}, {{components_memory_frequency}}, {{components_memory_type}}</li>";
+echo "<li><b>Hard drive columns</b>: {{components_harddrive_manufacturer}}, {{components_harddrive_model}}, {{components_harddrive_size}}, {{components_harddrive_type}}</li>";
+echo "<li><b>Network card columns</b>: {{components_networkcard_manufacturer}}, {{components_networkcard_model}}, {{components_networkcard_mac}}, {{components_networkcard_flow}}</li>";
+echo "<li><b>Graphic card columns</b>: {{components_graphiccard_manufacturer}}, {{components_graphiccard_model}}, {{components_graphiccard_memory}}, {{components_graphiccard_interface}}</li>";
+echo "<li><b>Monitor columns</b>: {{monitors_manufacturer}}, {{monitors_model}}, {{monitors_size}}, {{monitors_type}}, {{monitors_serial}} (alias: {{monitors_serial_number}}), {{monitors_count}}</li>";
+echo "<li><b>Component counts</b>: {{components_processor_count}}, {{components_memory_count}}, {{components_harddrive_count}}, {{components_networkcard_count}}</li>";
+echo "<li><b>Tables (auto-generated)</b>: {{monitors}}, {{components}}, {{network_ports}}, {{software}} (for backward compatibility)</li>";
 echo "<li><b>Any DB field</b>: {{field_<columnname>}} (e.g. {{field_contact}})</li>";
 echo "<li><b>Any FK</b>: {{hardware_<fieldname>_id}} or {{hardware_<fieldname>}} (resolved name)</li>";
 echo "<li><b>Misc</b>: {{generated_at}}</li>";
 echo "</ul>";
+echo "<p style='color:#666;font-size:0.9em;margin-top:10px;'><b>Note:</b> Component and monitor tables are row-based in v2. Put the placeholders in a single template row, and the renderer duplicates that row once per item.</p>";
 echo "</div>";
 
 echo "</div>";

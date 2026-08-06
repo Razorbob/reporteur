@@ -146,6 +146,46 @@ class PluginAlpreportTemplateProcessor
             $map['{{components_' . $shortKey . '_count}}'] = '0';
             $map['{{components_' . $shortKey . '_serial}}'] = '';
         }
+        
+        // v2 template: column-based component placeholders
+        // Processor columns
+        $map['{{components_processor_manufacturer}}'] = '';
+        $map['{{components_processor_model}}'] = '';
+        $map['{{components_processor_cores}}'] = '';
+        $map['{{components_processor_frequency}}'] = '';
+        $map['{{components_processor_threads}}'] = '';
+        // Memory columns
+        $map['{{components_memory_manufacturer}}'] = '';
+        $map['{{components_memory_model}}'] = '';
+        $map['{{components_memory_size}}'] = '';
+        $map['{{components_memory_frequency}}'] = '';
+        $map['{{components_memory_type}}'] = '';
+        // Hard drive columns
+        $map['{{components_harddrive_manufacturer}}'] = '';
+        $map['{{components_harddrive_model}}'] = '';
+        $map['{{components_harddrive_size}}'] = '';
+        $map['{{components_harddrive_type}}'] = '';
+        // Network card columns
+        $map['{{components_networkcard_manufacturer}}'] = '';
+        $map['{{components_networkcard_model}}'] = '';
+        $map['{{components_networkcard_mac}}'] = '';
+        $map['{{components_networkcard_flow}}'] = '';
+        // Graphic card columns
+        $map['{{components_graphiccard_manufacturer}}'] = '';
+        $map['{{components_graphiccard_model}}'] = '';
+        $map['{{components_graphiccard_memory}}'] = '';
+        $map['{{components_graphiccard_interface}}'] = '';
+        
+        // Monitor columns (v2 template)
+        $map['{{monitors_manufacturer}}'] = '';
+        $map['{{monitors_model}}'] = '';
+        $map['{{monitors_size}}'] = '';
+        $map['{{monitors_type}}'] = '';
+        $map['{{monitors_serial}}'] = '';
+        $map['{{monitors_serial_number}}'] = '';
+        $map['{{monitors_serila_number}}'] = '';
+        $map['{{monitors_count}}'] = '0';
+        
         // Software inventory placeholders.
         $map['{{software}}']         = '';
         $map['{{software_serial}}']  = '';
@@ -263,10 +303,10 @@ class PluginAlpreportTemplateProcessor
 
         // Components / devices.
         $components = self::collectComponents($item);
-        $map['{{components}}'] = self::flattenComponents($components, ' | ');
+        $map['{{components}}'] = self::flattenComponents($components, ', ');
         foreach ($components as $deviceType => $list) {
             $shortKey = strtolower(preg_replace('/^Device/', '', $deviceType));
-            $map['{{components_' . $shortKey . '}}'] = implode(' | ', $list['lines']);
+            $map['{{components_' . $shortKey . '}}'] = implode(', ', $list['lines']);
             $map['{{components_' . $shortKey . '_count}}'] = (string)count($list['lines']);
             $map['{{components_' . $shortKey . '_serial}}'] = implode(', ', array_filter($list['serials']));
         }
@@ -316,12 +356,44 @@ class PluginAlpreportTemplateProcessor
                 }
                 $softwareLines[] = $line;
             }
-            $map['{{software}}']        = implode(' | ', $softwareLines);
+            $map['{{software}}']        = implode(', ', $softwareLines);
             $map['{{software_serial}}'] = implode(', ', $softwareSerials);
             $map['{{software_count}}']  = (string)count($software);
         }
 
+        // Monitors (for Computers only).
+        $monitors = self::collectMonitors($item);
+        if (!empty($monitors)) {
+            $map['{{monitors_count}}'] = (string)count($monitors);
+        }
+
         return $map;
+    }
+
+    /**
+     * Build per-component row data for v2 template row duplication.
+     *
+     * @return array<string,array<int,array<string,string>>>
+     */
+    public static function buildComponentRowData(CommonDBTM $item): array
+    {
+        $result = [];
+
+        $components = self::collectComponents($item);
+        foreach ($components as $deviceType => $list) {
+            $shortKey = strtolower((string)preg_replace('/^Device/', '', (string)$deviceType));
+            $rows = $list['rows'] ?? [];
+            if (!empty($rows)) {
+                $result['components_' . $shortKey] = $rows;
+            }
+        }
+
+        $monitors = self::collectMonitors($item);
+        if (!empty($monitors)) {
+            $result['monitors'] = $monitors;
+        }
+
+        return $result;
     }
 
     /**
@@ -443,32 +515,332 @@ class PluginAlpreportTemplateProcessor
     }
 
     /**
-     * Build a minimal-but-styled Word table as raw OOXML.
-     * Borders are inlined so the output renders correctly even when the host
-     * document has no TableGrid style defined.
+     * Render a DOCX template with placeholders replaced.
+     * 
+     * This is the main entry point for template rendering. It orchestrates the
+     * complete pipeline: validation, XML extraction, placeholder normalization,
+     * table generation, and text replacement.
+     * 
+     * Pipeline:
+     * 1. Validate template file and open as ZIP archive
+     * 2. Extract XML parts (document.xml, headers, footers)
+     * 3. For each XML part:
+     *    - Normalize XML (fix split placeholders)
+     *    - Duplicate row-based component tables (v2 placeholders)
+     *    - Render tables ({{table_name}} → full Word tables)
+     *    - Render general placeholders ({{text}} → values)
+     * 4. Save modified ZIP and return temp file path
      *
+     * @param string $templatePath Path to the .docx template file
+     * @param array<string,string> $placeholderMap Map of {{key}} => value
+     * @param array<string,array{headers:string[],rows:array<int,string[]>}> $blockMap Map of {{key}} => table data
+     * @param array<string,array<int,array<string,string>>> $componentRowData Per-prefix rows for v2 row duplication
+     * @return string Path to generated temp .docx file
+     * @throws RuntimeException on validation or rendering errors
+     */
+    public static function render($templatePath, array $placeholderMap, array $blockMap = [], array $componentRowData = [])
+    {
+        // Validate template file
+        if (!is_file($templatePath)) {
+            throw new RuntimeException('Template not found: ' . $templatePath);
+        }
+        if (!is_readable($templatePath)) {
+            throw new RuntimeException('Template is not readable: ' . $templatePath);
+        }
+        if (!class_exists('ZipArchive')) {
+            throw new RuntimeException('PHP ZipArchive extension is required to render DOCX files.');
+        }
+
+        $templateSize = @filesize($templatePath);
+        if ($templateSize === false || $templateSize <= 0) {
+            throw new RuntimeException('Template file is empty or unreadable: ' . $templatePath);
+        }
+
+        // Read template and create working copy
+        $bytes = @file_get_contents($templatePath);
+        if ($bytes === false || $bytes === '') {
+            throw new RuntimeException('Could not read template bytes from ' . $templatePath);
+        }
+
+        $tempDir = sys_get_temp_dir();
+        if (!is_dir($tempDir) || !is_writable($tempDir)) {
+            throw new RuntimeException('System temp dir is not writable: ' . $tempDir);
+        }
+        $docxPath = $tempDir . DIRECTORY_SEPARATOR . 'alpreport_' . bin2hex(random_bytes(8)) . '.docx';
+
+        if (@file_put_contents($docxPath, $bytes) !== strlen($bytes)) {
+            @unlink($docxPath);
+            throw new RuntimeException('Could not write template to temp file: ' . $docxPath);
+        }
+
+        // Open DOCX as ZIP archive
+        $zip = new ZipArchive();
+        $openResult = $zip->open($docxPath);
+        if ($openResult !== true) {
+            $head = bin2hex(substr($bytes, 0, 4));
+            @unlink($docxPath);
+
+            $hint = '';
+            if (strncmp($head, '504b', 4) !== 0) {
+                $hint = ' The file does not start with the ZIP signature (50 4B 03 04),'
+                    . ' so it is not a real .docx package. In Microsoft Word, use'
+                    . ' "File > Save As > Word Document (*.docx)" — not "Word XML Document"'
+                    . ' or "Strict Open XML" — then re-upload.';
+            }
+
+            throw new RuntimeException(
+                'Could not open template as DOCX archive (ZipArchive error code ' . $openResult
+                . ', file size ' . $templateSize . ' bytes, first 4 bytes 0x' . $head . ').'
+                . $hint
+            );
+        }
+
+        try {
+            // Collect all XML parts to process
+            $targets = ['word/document.xml'];
+            for ($i = 1; $i <= 20; $i++) {
+                $headerName = 'word/header' . $i . '.xml';
+                if ($zip->locateName($headerName) !== false) {
+                    $targets[] = $headerName;
+                }
+                $footerName = 'word/footer' . $i . '.xml';
+                if ($zip->locateName($footerName) !== false) {
+                    $targets[] = $footerName;
+                }
+            }
+
+            // Process each XML part through the rendering pipeline
+            $touched = 0;
+            foreach ($targets as $entry) {
+                $xml = $zip->getFromName($entry);
+                if ($xml === false) {
+                    continue;
+                }
+
+                // Step 1: Normalize XML (fix Word's placeholder splitting)
+                $xml = self::normalizeXml($xml);
+
+                // Step 2: Duplicate component/monitor table rows (v2 template support)
+                $xml = self::duplicateComponentRows($xml, $componentRowData);
+
+                // Step 3: Render tables (replace {{table_name}} with full tables)
+                $xml = self::renderTable($xml, $blockMap, $placeholderMap);
+
+                // Step 4: Render general placeholders (replace {{text}} with values)
+                $xml = self::renderGeneral($xml, $placeholderMap);
+
+                if (!$zip->addFromString($entry, $xml)) {
+                    throw new RuntimeException('Failed to write replaced content into DOCX entry: ' . $entry);
+                }
+                $touched++;
+            }
+
+            if ($touched === 0) {
+                throw new RuntimeException('Template did not contain word/document.xml — not a valid DOCX.');
+            }
+        } catch (Throwable $e) {
+            $zip->close();
+            @unlink($docxPath);
+            throw $e;
+        }
+
+        if (!$zip->close()) {
+            @unlink($docxPath);
+            throw new RuntimeException('Failed to finalize DOCX archive.');
+        }
+
+        return $docxPath;
+    }
+
+    /**
+     * Duplicate table rows containing row-based component placeholders for v2 templates.
+     *
+     * Rows with placeholders like {{components_processor_manufacturer}} are expanded
+     * to one table row per component item from $componentRowData['components_processor'].
+     * If no rows exist for a prefix, the original row stays in place and gets cleared by renderGeneral().
+     *
+     * @param string $xml The Word document XML
+     * @param array<string,array<int,array<string,string>>> $componentRowData Per-prefix rows
+     * @return string Modified XML with duplicated rows
+     */
+    private static function duplicateComponentRows(string $xml, array $componentRowData): string
+    {
+        if (empty($componentRowData)) {
+            return $xml;
+        }
+
+        return preg_replace_callback(
+            '/<w:tr\b[^>]*>.*?<\/w:tr>/su',
+            static function (array $m) use ($componentRowData): string {
+                $rowXml = $m[0];
+
+                if (!preg_match_all('/\{\{(components_[a-z0-9]+|monitors)_([a-z0-9_]+)\}\}/i', $rowXml, $phMatches, PREG_SET_ORDER)) {
+                    return $rowXml;
+                }
+
+                $prefix = strtolower((string)$phMatches[0][1]);
+                foreach ($phMatches as $ph) {
+                    if (strtolower((string)$ph[1]) !== $prefix) {
+                        return $rowXml;
+                    }
+                }
+
+                $rows = $componentRowData[$prefix] ?? [];
+                if (empty($rows)) {
+                    return $rowXml;
+                }
+
+                $expandedRows = '';
+                foreach ($rows as $itemRow) {
+                    $expandedRows .= preg_replace_callback(
+                        '/\{\{' . preg_quote($prefix, '/') . '_([a-z0-9_]+)\}\}/i',
+                        static function (array $pm) use ($itemRow): string {
+                            $column = strtolower((string)$pm[1]);
+                            $value = (string)($itemRow[$column] ?? '');
+                            return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+                        },
+                        $rowXml
+                    );
+                }
+
+                return $expandedRows;
+            },
+            $xml
+        );
+    }
+
+    /**
+     * Replace simple text placeholders in XML.
+     * 
+     * Handles placeholders like {{asset_name}}, {{asset_serial}}, etc.
+     * Performs batch string replacement for efficiency.
+     * 
+     * Features:
+     * - XML-escapes all values to prevent malformed output
+     * - Converts \n to Word line breaks (<w:br/>)
+     * - Batch replacement for performance
+     * 
+     * @param string $xml The Word document XML
+     * @param array<string,string> $placeholderMap Map of {{key}} => value
+     * @return string Modified XML with placeholders replaced
+     */
+    private static function renderGeneral(string $xml, array $placeholderMap): string
+    {
+        $search = [];
+        $replace = [];
+        
+        foreach ($placeholderMap as $key => $value) {
+            $escaped = htmlspecialchars((string)$value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+            
+            // Convert embedded newlines to Word line breaks
+            if (strpos($escaped, "\n") !== false) {
+                $escaped = str_replace(
+                    ["\r\n", "\n"],
+                    ['</w:t><w:br/><w:t xml:space="preserve">', '</w:t><w:br/><w:t xml:space="preserve">'],
+                    $escaped
+                );
+            }
+            
+            $search[]  = $key;
+            $replace[] = $escaped;
+        }
+        
+        return str_replace($search, $replace, $xml);
+    }
+
+    /**
+     * Replace table placeholders with full Word tables.
+     * 
+     * Finds paragraphs containing table placeholders (e.g., {{monitors}}) and
+     * replaces the entire paragraph with a styled Word table. The table inherits
+     * font, size, color, and other properties from the placeholder's run.
+     * 
+     * Algorithm:
+     * 1. For each table placeholder in blockMap
+     * 2. Find paragraph containing the placeholder
+     * 3. Extract style properties from placeholder's <w:r>
+     * 4. Generate Word table XML with buildTableXml()
+     * 5. Replace entire paragraph with table
+     * 
+     * @param string $xml The Word document XML
+     * @param array<string,array{headers:string[],rows:array<int,string[]>}> $blockMap Table data
+     * @param array<string,string> $placeholderMap Reference to scalar map (modified to remove used keys)
+     * @return string Modified XML with table placeholders replaced
+     */
+    private static function renderTable(string $xml, array $blockMap, array &$placeholderMap): string
+    {
+        if (empty($blockMap)) {
+            return $xml;
+        }
+
+        foreach ($blockMap as $blockKey => $blockData) {
+            $needle = preg_quote($blockKey, '/');
+            $pattern = '/<w:p\b[^>]*>(?:(?!<\/w:p>).)*?' . $needle . '(?:(?!<\/w:p>).)*?<\/w:p>/su';
+
+            $xml = preg_replace_callback(
+                $pattern,
+                static function ($m) use ($blockKey, $blockData) {
+                    $paragraphXml = $m[0];
+
+                    // Extract style properties from the placeholder's run
+                    $rPrXml = '';
+                    $runPattern = '/<w:r\b[^>]*>(?:(?!<\/w:r>).)*?'
+                        . preg_quote($blockKey, '/')
+                        . '(?:(?!<\/w:r>).)*?<\/w:r>/su';
+                    if (preg_match($runPattern, $paragraphXml, $rm)) {
+                        if (preg_match('/<w:rPr\b[^>]*>.*?<\/w:rPr>|<w:rPr\b[^>]*\/>/s', $rm[0], $pm)) {
+                            $rPrXml = $pm[0];
+                        }
+                    }
+
+                    return self::buildTableXml(
+                        $blockData['headers'] ?? [],
+                        $blockData['rows'] ?? [],
+                        $rPrXml
+                    );
+                },
+                $xml,
+                1
+            );
+
+            // Remove from scalar map to prevent double-replacement
+            if (!array_key_exists($blockKey, $placeholderMap)) {
+                $placeholderMap[$blockKey] = '';
+            }
+        }
+
+        return $xml;
+    }
+
+    /**
+     * Build a Word table as raw OOXML.
+     * 
+     * Generates a complete Word table with headers and data rows. The table
+     * uses fixed layout with consistent borders and optional gray header shading.
+     * 
      * The optional $rPrXml argument is the raw <w:rPr>...</w:rPr> XML extracted
      * from the placeholder's run; when supplied, every cell's text run receives
      * those properties so the table inherits the placeholder's font/size/color.
      *
-     * @param string[]   $headers
-     * @param string[][] $rows
+     * @param string[]   $headers Column headers
+     * @param string[][] $rows Data rows (each row is array of cell values)
+     * @param string $rPrXml Optional style properties XML from placeholder
+     * @return string Complete Word table XML
      */
-    private static function buildWordTable(array $headers, array $rows, string $rPrXml = ''): string
+    private static function buildTableXml(array $headers, array $rows, string $rPrXml = ''): string
     {
         $colCount = max(1, count($headers));
 
-        $border = '<w:top w:val="single" w:sz="4" w:space="0" w:color="888888"/>'
-            . '<w:left w:val="single" w:sz="4" w:space="0" w:color="888888"/>'
-            . '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="888888"/>'
-            . '<w:right w:val="single" w:sz="4" w:space="0" w:color="888888"/>'
-            . '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="888888"/>'
-            . '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="888888"/>';
-
+        // Table properties matching document style
         $tblPr = '<w:tblPr>'
-            . '<w:tblW w:w="5000" w:type="pct"/>'
-            . '<w:tblBorders>' . $border . '</w:tblBorders>'
-            . '<w:tblLayout w:type="autofit"/>'
+            . '<w:tblW w:w="9216" w:type="dxa"/>'
+            . '<w:tblLayout w:type="fixed"/>'
+            . '<w:tblCellMar>'
+            . '<w:top w:w="0" w:type="dxa"/>'
+            . '<w:start w:w="71" w:type="dxa"/>'
+            . '<w:bottom w:w="0" w:type="dxa"/>'
+            . '<w:end w:w="71" w:type="dxa"/>'
+            . '</w:tblCellMar>'
             . '</w:tblPr>';
 
         $tblGrid = '<w:tblGrid>' . str_repeat('<w:gridCol/>', $colCount) . '</w:tblGrid>';
@@ -490,7 +862,7 @@ class PluginAlpreportTemplateProcessor
         }
         $headerRPr = '<w:rPr>' . $headerInner . '</w:rPr>';
 
-        $renderCell = static function (string $text, string $cellRPr, bool $shaded): string {
+        $renderCell = static function (string $text, string $cellRPr, bool $isHeader): string {
             $escaped = htmlspecialchars($text, ENT_XML1 | ENT_COMPAT, 'UTF-8');
             // Convert embedded newlines to Word line breaks.
             if (strpos($escaped, "\n") !== false) {
@@ -500,10 +872,23 @@ class PluginAlpreportTemplateProcessor
                     $escaped
                 );
             }
-            $shading = $shaded
-                ? '<w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="E6E6E6"/></w:tcPr>'
-                : '<w:tcPr/>';
-            return '<w:tc>' . $shading
+            
+            // Cell borders matching document style - thicker black borders
+            $borders = '<w:tcBorders>'
+                . '<w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+                . '<w:start w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+                . '<w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+                . '<w:end w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+                . '</w:tcBorders>';
+            
+            // Light gray shading for header cells
+            $shading = $isHeader
+                ? '<w:shd w:val="clear" w:color="auto" w:fill="E6E6E6"/>'
+                : '';
+            
+            $tcPr = '<w:tcPr>' . $borders . $shading . '</w:tcPr>';
+            
+            return '<w:tc>' . $tcPr
                 . '<w:p><w:r>' . $cellRPr . '<w:t xml:space="preserve">' . $escaped . '</w:t></w:r></w:p>'
                 . '</w:tc>';
         };
@@ -527,180 +912,11 @@ class PluginAlpreportTemplateProcessor
     }
 
     /**
-     * Render a DOCX file using the placeholder map and return a temp file path.
-     *
-     * @param array<string,string> $placeholderMap key (e.g. "{{asset_name}}") => replacement string
-     * @param array<string,array{headers:string[],rows:array<int,string[]>}> $blockMap
-     *        key => structured table data; the entire enclosing <w:p> is replaced
-     *        with a Word table whose runs inherit the placeholder's <w:rPr>.
+     * @deprecated Use render() instead. Kept for backward compatibility.
      */
-    public static function renderDocx($templatePath, array $placeholderMap, array $blockMap = [])
+    public static function renderDocx($templatePath, array $placeholderMap, array $blockMap = [], array $componentRowData = [])
     {
-        if (!is_file($templatePath)) {
-            throw new RuntimeException('Template not found: ' . $templatePath);
-        }
-        if (!is_readable($templatePath)) {
-            throw new RuntimeException('Template is not readable: ' . $templatePath);
-        }
-        if (!class_exists('ZipArchive')) {
-            throw new RuntimeException('PHP ZipArchive extension is required to render DOCX files.');
-        }
-
-        $templateSize = @filesize($templatePath);
-        if ($templateSize === false || $templateSize <= 0) {
-            throw new RuntimeException('Template file is empty or unreadable: ' . $templatePath);
-        }
-
-        // Read the original bytes and write them to a unique temp file.
-        // tempnam + rename + copy was unreliable on some systems; this is simpler.
-        $bytes = @file_get_contents($templatePath);
-        if ($bytes === false || $bytes === '') {
-            throw new RuntimeException('Could not read template bytes from ' . $templatePath);
-        }
-
-        $tempDir = sys_get_temp_dir();
-        if (!is_dir($tempDir) || !is_writable($tempDir)) {
-            throw new RuntimeException('System temp dir is not writable: ' . $tempDir);
-        }
-        $docxPath = $tempDir . DIRECTORY_SEPARATOR . 'alpreport_' . bin2hex(random_bytes(8)) . '.docx';
-
-        if (@file_put_contents($docxPath, $bytes) !== strlen($bytes)) {
-            @unlink($docxPath);
-            throw new RuntimeException('Could not write template to temp file: ' . $docxPath);
-        }
-
-        $zip = new ZipArchive();
-        $openResult = $zip->open($docxPath);
-        if ($openResult !== true) {
-            $head = bin2hex(substr($bytes, 0, 4));
-            @unlink($docxPath);
-
-            // A real .docx is a ZIP archive starting with PK\x03\x04 (504b0304).
-            // Anything else is almost always a Word XML document, a Strict Open XML
-            // file, or a plain text/HTML file saved with a .docx extension.
-            $hint = '';
-            if (strncmp($head, '504b', 4) !== 0) {
-                $hint = ' The file does not start with the ZIP signature (50 4B 03 04),'
-                    . ' so it is not a real .docx package. In Microsoft Word, use'
-                    . ' "File > Save As > Word Document (*.docx)" — not "Word XML Document"'
-                    . ' or "Strict Open XML" — then re-upload.';
-            }
-
-            throw new RuntimeException(
-                'Could not open template as DOCX archive (ZipArchive error code ' . $openResult
-                . ', file size ' . $templateSize . ' bytes, first 4 bytes 0x' . $head . ').'
-                . $hint
-            );
-        }
-
-        try {
-            $targets = ['word/document.xml'];
-            for ($i = 1; $i <= 20; $i++) {
-                $headerName = 'word/header' . $i . '.xml';
-                if ($zip->locateName($headerName) !== false) {
-                    $targets[] = $headerName;
-                }
-                $footerName = 'word/footer' . $i . '.xml';
-                if ($zip->locateName($footerName) !== false) {
-                    $targets[] = $footerName;
-                }
-            }
-
-            $touched = 0;
-            foreach ($targets as $entry) {
-                $xml = $zip->getFromName($entry);
-                if ($xml === false) {
-                    continue;
-                }
-
-                $xml = self::repairSplitPlaceholders($xml);
-
-                // First, replace block placeholders: when a paragraph contains one of
-                // these, the entire <w:p>...</w:p> is swapped out for a Word table
-                // whose runs inherit the placeholder's <w:rPr> (font, size, color).
-                if (!empty($blockMap)) {
-                    foreach ($blockMap as $blockKey => $blockData) {
-                        $needle = preg_quote($blockKey, '/');
-                        $pattern = '/<w:p\b[^>]*>(?:(?!<\/w:p>).)*?' . $needle . '(?:(?!<\/w:p>).)*?<\/w:p>/su';
-
-                        $xml = preg_replace_callback(
-                            $pattern,
-                            static function ($m) use ($blockKey, $blockData) {
-                                $paragraphXml = $m[0];
-
-                                // Locate the <w:r> that contains the placeholder and
-                                // extract its <w:rPr> so the table inherits the
-                                // placeholder's font / size / color / bold / italic.
-                                $rPrXml = '';
-                                $runPattern = '/<w:r\b[^>]*>(?:(?!<\/w:r>).)*?'
-                                    . preg_quote($blockKey, '/')
-                                    . '(?:(?!<\/w:r>).)*?<\/w:r>/su';
-                                if (preg_match($runPattern, $paragraphXml, $rm)) {
-                                    if (preg_match('/<w:rPr\b[^>]*>.*?<\/w:rPr>|<w:rPr\b[^>]*\/>/s', $rm[0], $pm)) {
-                                        $rPrXml = $pm[0];
-                                    }
-                                }
-
-                                return self::buildWordTable(
-                                    $blockData['headers'] ?? [],
-                                    $blockData['rows'] ?? [],
-                                    $rPrXml
-                                );
-                            },
-                            $xml,
-                            1
-                        );
-
-                        // Also strip the placeholder key from the scalar map so any
-                        // leftover occurrences (outside a paragraph context, unlikely)
-                        // don't end up as a literal "{{components}}" string.
-                        if (!array_key_exists($blockKey, $placeholderMap)) {
-                            $placeholderMap[$blockKey] = '';
-                        }
-                    }
-                }
-
-                $search = [];
-                $replace = [];
-                foreach ($placeholderMap as $key => $value) {
-                    $escaped = htmlspecialchars((string)$value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
-                    // Convert embedded newlines to Word line breaks. This assumes the
-                    // placeholder sits inside a <w:t> run (the normal case after
-                    // repairSplitPlaceholders). For non-text contexts the inserted
-                    // markup will appear as literal text — acceptable trade-off.
-                    if (strpos($escaped, "\n") !== false) {
-                        $escaped = str_replace(
-                            ["\r\n", "\n"],
-                            ['</w:t><w:br/><w:t xml:space="preserve">', '</w:t><w:br/><w:t xml:space="preserve">'],
-                            $escaped
-                        );
-                    }
-                    $search[]  = $key;
-                    $replace[] = $escaped;
-                }
-                $newXml = str_replace($search, $replace, $xml);
-
-                if (!$zip->addFromString($entry, $newXml)) {
-                    throw new RuntimeException('Failed to write replaced content into DOCX entry: ' . $entry);
-                }
-                $touched++;
-            }
-
-            if ($touched === 0) {
-                throw new RuntimeException('Template did not contain word/document.xml — not a valid DOCX.');
-            }
-        } catch (Throwable $e) {
-            $zip->close();
-            @unlink($docxPath);
-            throw $e;
-        }
-
-        if (!$zip->close()) {
-            @unlink($docxPath);
-            throw new RuntimeException('Failed to finalize DOCX archive.');
-        }
-
-        return $docxPath;
+        return self::render($templatePath, $placeholderMap, $blockMap, $componentRowData);
     }
 
     public static function resolveAsset($itemType, $itemId)
@@ -734,18 +950,45 @@ class PluginAlpreportTemplateProcessor
     }
 
     /**
-     * If Word splits a placeholder across multiple <w:r> runs, this strips
-     * the inner XML tags so the placeholder text becomes contiguous again.
+     * Duplicate table rows that contain row-repeating placeholders.
+     * For example, a row containing {{components_harddrive_manufacturer}},
+     * {{components_harddrive_serial}}, {{components_harddrive_size}} will be
+     * duplicated N times (once per hard drive) and each duplicate will have
+     * its placeholders replaced with the corresponding item's data.
+     *
+     * @param string $xml The document XML
+     * @param array<string,string> $placeholderMap
+     * @return string Modified XML with rows duplicated
      */
-    private static function repairSplitPlaceholders($xml)
+    /**
+     * Normalize XML to fix Word's placeholder splitting.
+     * 
+     * Microsoft Word sometimes splits placeholder text across multiple <w:r> runs,
+     * causing "{{asset" and "_name}}" to appear in separate tags. This function
+     * detects such cases and strips the inner XML tags to make the placeholder
+     * contiguous again. Also normalizes whitespace inside placeholders.
+     * 
+     * Example transformation:
+     * Before: <w:r><w:t>{{asset</w:t></w:r><w:r><w:t>_name}}</w:t></w:r>
+     * After:  {{asset_name}}
+     * 
+     * @param string $xml The Word document XML
+     * @return string Normalized XML
+     */
+    private static function normalizeXml($xml)
     {
-        return preg_replace_callback(
+        // Fix split placeholders
+        $xml = preg_replace_callback(
             '/\{\{[^{}]*?(?:<[^>]+>[^{}]*?)+\}\}/u',
             static function ($m) {
-                return preg_replace('/<[^>]+>/', '', $m[0]);
+                $placeholder = preg_replace('/<[^>]+>/', '', $m[0]);
+                return preg_replace('/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/u', '{{$1}}', $placeholder);
             },
             $xml
         );
+
+        // Normalize whitespace in all placeholders
+        return preg_replace('/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/u', '{{$1}}', $xml);
     }
 
     private static function resolveForeignKey($fkField, $id)
@@ -786,6 +1029,7 @@ class PluginAlpreportTemplateProcessor
 
         $itemtype = $item::getType();
         $id = (int)$item->getID();
+        $networkPortRowsForComponents = null;
 
         try {
             $portIter = $DB->request([
@@ -929,11 +1173,16 @@ class PluginAlpreportTemplateProcessor
                         }
                     }
 
+                    $frequency = self::resolveComponentFrequency($linkRow, is_array($devRow) ? $devRow : null);
+
                     $extras = [];
-                    foreach (['serial', 'otherserial', 'busID', 'capacity', 'frequency'] as $extraKey) {
+                    foreach (['serial', 'otherserial', 'busID', 'capacity'] as $extraKey) {
                         if (!empty($linkRow[$extraKey])) {
                             $extras[] = $extraKey . '=' . $linkRow[$extraKey];
                         }
+                    }
+                    if ($frequency !== '') {
+                        $extras[] = 'frequency=' . $frequency;
                     }
 
                     $line = $extras
@@ -947,12 +1196,159 @@ class PluginAlpreportTemplateProcessor
                     if ($serial !== '') {
                         $grouped[$deviceType]['serials'][] = $serial;
                     }
-                    $grouped[$deviceType]['rows'][] = [
+                    
+                    // Base row data (common to all device types)
+                    $row = [
                         'name'         => $name,
                         'manufacturer' => $manufacturer,
                         'serial'       => $serial,
                         'otherserial'  => $otherserial,
+                        'capacity'     => (string)($linkRow['capacity'] ?? ''),
+                        'frequency'    => $frequency,
+                        'busID'        => (string)($linkRow['busID'] ?? ''),
                     ];
+                    
+                    // Device-specific fields for v2 template column placeholders
+                    // Processor: model, cores, threads, frequency
+                    if ($deviceType === 'DeviceProcessor') {
+                        $defaultCores = is_array($devRow) ? (string)($devRow['nbcores_default'] ?? '') : '';
+                        $defaultThreads = is_array($devRow) ? (string)($devRow['nbthreads_default'] ?? '') : '';
+                        $row['cores'] = (string)($linkRow['nbcores'] ?? $defaultCores);
+                        $row['threads'] = (string)($linkRow['nbthreads'] ?? $defaultThreads);
+                        $row['model'] = '';
+                        if (is_array($devRow) && !empty($devRow['deviceprocessormodels_id']) && is_numeric($devRow['deviceprocessormodels_id'])) {
+                            $modelName = Dropdown::getDropdownName('glpi_deviceprocessormodels', (int)$devRow['deviceprocessormodels_id']);
+                            if ($modelName && $modelName !== '&nbsp;') {
+                                $row['model'] = trim(strip_tags($modelName));
+                            }
+                        }
+                        if ($row['model'] === '') {
+                            $row['model'] = $name;
+                        }
+                    }
+                    
+                    // Memory: model, size, type, frequency
+                    if ($deviceType === 'DeviceMemory') {
+                        $row['model'] = '';
+                        if (is_array($devRow) && !empty($devRow['devicememorymodels_id']) && is_numeric($devRow['devicememorymodels_id'])) {
+                            $modelName = Dropdown::getDropdownName('glpi_devicememorymodels', (int)$devRow['devicememorymodels_id']);
+                            if ($modelName && $modelName !== '&nbsp;') {
+                                $row['model'] = trim(strip_tags($modelName));
+                            }
+                        }
+                        if ($row['model'] === '') {
+                            $row['model'] = $name;
+                        }
+                        $row['size'] = (string)($linkRow['size'] ?? $linkRow['capacity'] ?? '');
+                        $row['type'] = '';
+                        // Resolve memory type (DDR3, DDR4, etc.) from link row or device row.
+                        $memoryTypeId = 0;
+                        if (!empty($linkRow['devicememorytypes_id']) && is_numeric($linkRow['devicememorytypes_id'])) {
+                            $memoryTypeId = (int)$linkRow['devicememorytypes_id'];
+                        } elseif (is_array($devRow) && !empty($devRow['devicememorytypes_id']) && is_numeric($devRow['devicememorytypes_id'])) {
+                            $memoryTypeId = (int)$devRow['devicememorytypes_id'];
+                        }
+                        if ($memoryTypeId > 0) {
+                            $typeName = Dropdown::getDropdownName('glpi_devicememorytypes', $memoryTypeId);
+                            if ($typeName && $typeName !== '&nbsp;') {
+                                $row['type'] = trim(strip_tags($typeName));
+                            }
+                        }
+                    }
+                    
+                    // Hard drive: model, size, type
+                    if ($deviceType === 'DeviceHardDrive') {
+                        $row['model'] = '';
+                        if (is_array($devRow) && !empty($devRow['deviceharddrivemodels_id']) && is_numeric($devRow['deviceharddrivemodels_id'])) {
+                            $modelName = Dropdown::getDropdownName('glpi_deviceharddrivemodels', (int)$devRow['deviceharddrivemodels_id']);
+                            if ($modelName && $modelName !== '&nbsp;') {
+                                $row['model'] = trim(strip_tags($modelName));
+                            }
+                        }
+                        if ($row['model'] === '') {
+                            $row['model'] = $name;
+                        }
+                        $row['size'] = (string)($linkRow['capacity'] ?? '');
+                        $row['type'] = '';
+                        // Try to determine type from interface or name
+                        if (!empty($linkRow['interface'])) {
+                            $interface = (string)$linkRow['interface'];
+                            if (stripos($interface, 'nvme') !== false) {
+                                $row['type'] = 'NVMe';
+                            } elseif (stripos($interface, 'ssd') !== false || stripos($name, 'ssd') !== false) {
+                                $row['type'] = 'SSD';
+                            } elseif (stripos($name, 'hdd') !== false) {
+                                $row['type'] = 'HDD';
+                            } else {
+                                $row['type'] = 'HDD'; // default for traditional drives
+                            }
+                        } elseif (stripos($name, 'ssd') !== false || stripos($name, 'solid') !== false) {
+                            $row['type'] = 'SSD';
+                        } elseif (stripos($name, 'nvme') !== false) {
+                            $row['type'] = 'NVMe';
+                        } else {
+                            $row['type'] = 'HDD';
+                        }
+                    }
+                    
+                    // Network card: model, mac, flow/bandwidth
+                    if ($deviceType === 'DeviceNetworkCard') {
+                        $row['model'] = $name; // Device name is typically the model
+                        $row['mac'] = (string)($linkRow['mac'] ?? ''); // Some tables have mac directly
+                        $row['flow'] = '';
+
+                        if (!is_array($networkPortRowsForComponents)) {
+                            $networkPortRowsForComponents = self::collectNetworkPorts($item)['rows'] ?? [];
+                        }
+                        $networkCardRowIndex = isset($grouped[$deviceType]) ? count($grouped[$deviceType]['rows']) : 0;
+                        $portRow = $networkPortRowsForComponents[$networkCardRowIndex] ?? [];
+                        if ($row['mac'] === '' && is_array($portRow)) {
+                            $row['mac'] = (string)($portRow['mac'] ?? '');
+                        }
+
+                        // Try to get bandwidth/speed
+                        if (!empty($linkRow['bandwidth'])) {
+                            $row['flow'] = (string)$linkRow['bandwidth'];
+                        } elseif (is_array($devRow) && !empty($devRow['bandwidth'])) {
+                            $row['flow'] = (string)$devRow['bandwidth'];
+                        } elseif (is_array($portRow) && !empty($portRow['speed'])) {
+                            $row['flow'] = (string)$portRow['speed'];
+                        } elseif (preg_match('/(\d+)\s*(mb|gb|mbit|gbit)/i', $name, $matches)) {
+                            // Extract speed from name (e.g., "1000Mbit" or "1Gb")
+                            $row['flow'] = $matches[1] . ' ' . strtoupper($matches[2]);
+                        }
+                    }
+
+                    // Graphic card: model, memory
+                    if ($deviceType === 'DeviceGraphicCard') {
+                        $row['model'] = '';
+                        if (is_array($devRow) && !empty($devRow['devicegraphiccardmodels_id']) && is_numeric($devRow['devicegraphiccardmodels_id'])) {
+                            $modelName = Dropdown::getDropdownName('glpi_devicegraphiccardmodels', (int)$devRow['devicegraphiccardmodels_id']);
+                            if ($modelName && $modelName !== '&nbsp;') {
+                                $row['model'] = trim(strip_tags($modelName));
+                            }
+                        }
+                        if ($row['model'] === '') {
+                            $row['model'] = $name;
+                        }
+                        $row['memory'] = (string)($linkRow['memory'] ?? $devRow['memory_default'] ?? '');
+                        $row['interface'] = trim((string)($linkRow['interface'] ?? $devRow['interface'] ?? ''));
+                        if ($row['interface'] === '' && !empty($devRow['interfacetypes_id']) && is_numeric($devRow['interfacetypes_id'])) {
+                            $resolvedInterface = self::resolveForeignKey('interfacetypes_id', (int)$devRow['interfacetypes_id']);
+                            if ($resolvedInterface !== null) {
+                                $row['interface'] = $resolvedInterface;
+                            }
+                        }
+                        if ($row['interface'] === '') {
+                            if (preg_match('/\b(pcie|pci[-\s]?express|pci|agp|mxm)\b/i', $name, $matches)) {
+                                $row['interface'] = strtoupper(str_replace(' ', '', (string)$matches[1]));
+                            } elseif (!empty($linkRow['busID'])) {
+                                $row['interface'] = (string)$linkRow['busID'];
+                            }
+                        }
+                    }
+                    
+                    $grouped[$deviceType]['rows'][] = $row;
                 }
             } catch (Throwable $e) {
                 continue;
@@ -960,6 +1356,33 @@ class PluginAlpreportTemplateProcessor
         }
 
         return $grouped;
+    }
+
+    /**
+     * Resolve a component frequency value for templates.
+     *
+     * Prioritizes the item-specific value from the link table and falls back to
+     * the component's default frequency when present.
+     */
+    private static function resolveComponentFrequency(array $linkRow, ?array $devRow = null): string
+    {
+        $frequency = trim((string)($linkRow['frequency'] ?? ''));
+        if ($frequency !== '') {
+            return $frequency;
+        }
+
+        if (!is_array($devRow)) {
+            return '';
+        }
+
+        foreach (['frequency_default', 'frequence', 'frequence_default', 'frequency'] as $frequencyField) {
+            $value = trim((string)($devRow[$frequencyField] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     private static function flattenComponents(array $grouped, $separator)
@@ -972,6 +1395,13 @@ class PluginAlpreportTemplateProcessor
         return implode($separator, $parts);
     }
 
+    /**
+     * Build placeholders used by repeating component table rows.
+     *
+     * @param array<string,array{lines:string[],rows:array<int,array<string,string>>,serials:string[]}> $components
+     * @param array<int,array<string,string>> $networkPortRows
+     * @return array<string,string>
+     */
     /**
      * Operating system info via glpi_items_operatingsystems pivot.
      * @return array<string,string>
@@ -1354,6 +1784,23 @@ class PluginAlpreportTemplateProcessor
                     }
                 }
 
+                $speed = '';
+                if ($DB->tableExists('glpi_networkportethernets')) {
+                    try {
+                        $speedIter = $DB->request([
+                            'SELECT' => ['speed'],
+                            'FROM'   => 'glpi_networkportethernets',
+                            'WHERE'  => ['networkports_id' => $portId],
+                            'LIMIT'  => 1,
+                        ]);
+                        foreach ($speedIter as $speedRow) {
+                            $speed = trim((string)($speedRow['speed'] ?? ''));
+                        }
+                    } catch (Throwable $e) {
+                        // ignore
+                    }
+                }
+
                 $parts = [];
                 if ($logical !== '' && $logical !== null) {
                     $parts[] = '#' . $logical;
@@ -1384,6 +1831,7 @@ class PluginAlpreportTemplateProcessor
                     'mac'     => $mac,
                     'ip'      => $ip,
                     'vlan'    => $vlan,
+                    'speed'   => $speed,
                 ];
             }
         } catch (Throwable $e) {
@@ -1480,6 +1928,8 @@ class PluginAlpreportTemplateProcessor
                     'type'         => $type,
                     'size'         => $size,
                     'serial'       => trim((string)($row['serial'] ?? '')),
+                    'serial_number'=> trim((string)($row['serial'] ?? '')),
+                    'serila_number'=> trim((string)($row['serial'] ?? '')),
                     'otherserial'  => trim((string)($row['otherserial'] ?? '')),
                     'comment'      => trim((string)($row['comment'] ?? '')),
                 ];
