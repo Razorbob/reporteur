@@ -4,7 +4,7 @@ require_once __DIR__ . '/Template/bootstrap.php';
 
 class PluginAlpreportTemplateProcessor
 {
-    public const SUPPORTED_ITEMTYPES = ['Computer', 'NetworkEquipment', 'Rack'];
+    public const SUPPORTED_ASSET_TYPES = ['Computer', 'NetworkEquipment', 'Rack', 'Printer'];
 
     /**
      * Device classes we always emit placeholder slots for, so the template never
@@ -202,7 +202,7 @@ class PluginAlpreportTemplateProcessor
         if (!is_string($itemType) || $itemType === '') {
             throw new RuntimeException('Missing asset type.');
         }
-        if (!in_array($itemType, self::SUPPORTED_ITEMTYPES, true)) {
+        if (!in_array($itemType, self::SUPPORTED_ASSET_TYPES, true)) {
             throw new RuntimeException('Unsupported asset type: ' . $itemType);
         }
         if (!class_exists($itemType)) {

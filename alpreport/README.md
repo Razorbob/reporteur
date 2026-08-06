@@ -3,7 +3,7 @@
 Simple GLPI 11 plugin to:
 
 - Upload a `.docx` template that contains placeholders.
-- Generate a filled `.docx` for a `Computer`, `NetworkEquipment`, or `Rack` asset.
+- Generate a filled `.docx` for a `Computer`, `NetworkEquipment`, `Rack`, or `Printer` asset.
 
 ## Install
 
@@ -46,8 +46,8 @@ You can also click **Download sample template** on the form page to get a ready-
 | `{{asset_location}}` | `glpi_locations` |
 | `{{asset_state}}` | `glpi_states` |
 | `{{asset_manufacturer}}` | `glpi_manufacturers` |
-| `{{asset_model}}` | `glpi_computermodels` / `glpi_networkequipmentmodels` |
-| `{{asset_type}}` | `glpi_computertypes` / `glpi_networkequipmenttypes` |
+| `{{asset_model}}` | `glpi_computermodels` / `glpi_networkequipmentmodels` / `glpi_rackmodels` / `glpi_printermodels` |
+| `{{asset_type}}` | `glpi_computertypes` / `glpi_networkequipmenttypes` / `glpi_racktypes` / `glpi_printertypes` |
 | `{{asset_entity}}` | `glpi_entities` (full path) |
 | `{{asset_network}}` | `glpi_networks` |
 
@@ -114,7 +114,7 @@ Available types: `processor`, `memory`, `harddrive`, `networkcard`, `graphiccard
 `soundcard`, `motherboard`, `powersupply`, `drive`, `control`, `case`, `pci`,
 `simcard`, `sensor`, `battery`, `firmware`, `generic`, `camera`.
 
-### Software inventory *(Computer only, via `glpi_items_softwareversions`)*
+### Software inventory *(via `glpi_items_softwareversions`, when available for the asset type)*
 
 - `{{software}}` â€” pipe-separated list of `Name Version [SN: serial]`
 - `{{software_serial}}` â€” license serials linked via `glpi_items_softwarelicenses`
@@ -165,6 +165,7 @@ uploading a `.docx` file via the form.
 - `Computer`
 - `NetworkEquipment`
 - `Rack`
+- `Printer`
 
-Other itemtypes can be added by extending `SUPPORTED_ITEMTYPES` in
+Other asset types can be added by extending `SUPPORTED_ASSET_TYPES` in
 `inc/templateprocessor.class.php`.

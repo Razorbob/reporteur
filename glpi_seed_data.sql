@@ -520,3 +520,117 @@ INSERT IGNORE INTO glpi_assets_assets_peripheralassets (
 (200, 'Computer', 200, 'Monitor', 200, 0, 0),  -- WS-TEST-001 <-> Dell U2720Q #1
 (201, 'Computer', 200, 'Monitor', 201, 0, 0),  -- WS-TEST-001 <-> Dell U2720Q #2 (dual setup)
 (202, 'Computer', 202, 'Monitor', 202, 0, 0);  -- PC-TEST-001 <-> LG 27UK850
+
+-- Printer Manufacturers
+INSERT IGNORE INTO glpi_manufacturers (id, name) VALUES
+(220, 'HP'),
+(221, 'Canon'),
+(222, 'Brother');
+
+-- Printer Types
+INSERT IGNORE INTO glpi_printertypes (id, name) VALUES
+(200, 'Laser MFP'),
+(201, 'Color Laser'),
+(202, 'Label Printer');
+
+-- Printer Models
+INSERT IGNORE INTO glpi_printermodels (id, name) VALUES
+(200, 'LaserJet Enterprise MFP M528dn'),
+(201, 'imageCLASS MF753Cdw'),
+(202, 'QL-820NWB');
+
+-- Printers
+INSERT IGNORE INTO glpi_printers (
+    id, entities_id, is_recursive, name, serial, otherserial, uuid, contact, contact_num, comment,
+    locations_id, states_id, manufacturers_id, printermodels_id, printertypes_id,
+    users_id, users_id_tech, is_global, is_deleted, is_template, date_creation, date_mod
+) VALUES
+(200, @entity_id, 0, 'PRN-OFFICE-MFP-01', 'PRN-SN-200', 'PRN-INV-200', 'uuid-prn-200', 'Design Team', '+1-555-0301', 'Shared monochrome MFP in the main office copy area',
+    200, 200, 220, 200, 200,
+    0, 203, 1, 0, 0, NOW(), NOW()),
+(201, @entity_id, 0, 'PRN-FINANCE-COLOR-01', 'PRN-SN-201', 'PRN-INV-201', 'uuid-prn-201', 'Finance Team', '+1-555-0302', 'Color laser printer for finance reports and invoices',
+    200, 200, 221, 201, 201,
+    201, 203, 1, 0, 0, NOW(), NOW()),
+(202, @entity_id, 0, 'PRN-LABEL-01', 'PRN-SN-202', 'PRN-INV-202', 'uuid-prn-202', 'IT Ops', '+1-555-0303', 'Network label printer for asset tags and shipping labels',
+    200, 201, 222, 202, 202,
+    203, 203, 1, 0, 0, NOW(), NOW());
+
+-- Update printers (in case they already exist)
+UPDATE glpi_printers SET
+    name = 'PRN-OFFICE-MFP-01',
+    serial = 'PRN-SN-200',
+    otherserial = 'PRN-INV-200',
+    contact = 'Design Team',
+    contact_num = '+1-555-0301',
+    comment = 'Shared monochrome MFP in the main office copy area',
+    locations_id = 200,
+    states_id = 200,
+    manufacturers_id = 220,
+    printermodels_id = 200,
+    printertypes_id = 200,
+    users_id_tech = 203,
+    is_global = 1,
+    is_deleted = 0
+WHERE id = 200;
+
+UPDATE glpi_printers SET
+    name = 'PRN-FINANCE-COLOR-01',
+    serial = 'PRN-SN-201',
+    otherserial = 'PRN-INV-201',
+    contact = 'Finance Team',
+    contact_num = '+1-555-0302',
+    comment = 'Color laser printer for finance reports and invoices',
+    locations_id = 200,
+    states_id = 200,
+    manufacturers_id = 221,
+    printermodels_id = 201,
+    printertypes_id = 201,
+    users_id = 201,
+    users_id_tech = 203,
+    is_global = 1,
+    is_deleted = 0
+WHERE id = 201;
+
+UPDATE glpi_printers SET
+    name = 'PRN-LABEL-01',
+    serial = 'PRN-SN-202',
+    otherserial = 'PRN-INV-202',
+    contact = 'IT Ops',
+    contact_num = '+1-555-0303',
+    comment = 'Network label printer for asset tags and shipping labels',
+    locations_id = 200,
+    states_id = 201,
+    manufacturers_id = 222,
+    printermodels_id = 202,
+    printertypes_id = 202,
+    users_id = 203,
+    users_id_tech = 203,
+    is_global = 1,
+    is_deleted = 0
+WHERE id = 202;
+
+-- Printer rack placements
+INSERT IGNORE INTO glpi_items_racks (itemtype, items_id, racks_id, position, orientation) VALUES
+('Printer', 200, 201, 12, 0),
+('Printer', 202, 201, 14, 0);
+
+-- Network ports for printers
+INSERT IGNORE INTO glpi_networkports (id, items_id, itemtype, entities_id, name, mac, instantiation_type, logical_number) VALUES
+(240, 200, 'Printer', @entity_id, 'eth0', '00:cc:00:00:02:40', 'NetworkPortEthernet', 1),
+(241, 201, 'Printer', @entity_id, 'eth0', '00:cc:00:00:02:41', 'NetworkPortEthernet', 1),
+(242, 202, 'Printer', @entity_id, 'eth0', '00:cc:00:00:02:42', 'NetworkPortEthernet', 1);
+
+INSERT IGNORE INTO glpi_networkportethernets (id, networkports_id, speed) VALUES
+(240, 240, 1000),
+(241, 241, 1000),
+(242, 242, 100);
+
+INSERT IGNORE INTO glpi_networknames (id, entities_id, items_id, itemtype, name) VALUES
+(240, @entity_id, 240, 'NetworkPort', 'PRN-OFFICE-MFP-01'),
+(241, @entity_id, 241, 'NetworkPort', 'PRN-FINANCE-COLOR-01'),
+(242, @entity_id, 242, 'NetworkPort', 'PRN-LABEL-01');
+
+INSERT IGNORE INTO glpi_ipaddresses (id, entities_id, items_id, itemtype, name, version) VALUES
+(240, @entity_id, 240, 'NetworkName', '192.168.100.50', 4),
+(241, @entity_id, 241, 'NetworkName', '192.168.100.51', 4),
+(242, @entity_id, 242, 'NetworkName', '192.168.100.52', 4);

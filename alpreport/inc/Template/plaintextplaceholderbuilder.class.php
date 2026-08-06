@@ -89,6 +89,10 @@ class PluginAlpreportPlainTextPlaceholderBuilder
             $aliases['model'] = 'rackmodels_id';
             $aliases['type']  = 'racktypes_id';
         }
+        if (class_exists('Printer') && $item instanceof Printer) {
+            $aliases['model'] = 'printermodels_id';
+            $aliases['type']  = 'printertypes_id';
+        }
 
         return $aliases;
     }
