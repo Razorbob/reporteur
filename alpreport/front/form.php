@@ -9,8 +9,51 @@ Session::checkLoginUser();
 
 require_once(__DIR__ . '/../inc/templateprocessor.class.php');
 
+$formUrl = ($CFG_GLPI['root_doc'] ?? '') . '/plugins/alpreport/front/form.php';
+
+if (empty($_SESSION['plugin_alpreport_csrf'])) {
+    $_SESSION['plugin_alpreport_csrf'] = bin2hex(random_bytes(32));
+}
+
 $errorMessage = '';
-$infoMessage = '';
+$infoMessage = trim((string)($_GET['deleted_template'] ?? '')) !== ''
+    ? 'Template deleted: ' . basename((string)$_GET['deleted_template'])
+    : '';
+
+if (isset($_GET['delete_template'])) {
+    try {
+        $submittedToken = (string)($_GET['_alpreport_token'] ?? '');
+        $expectedToken = (string)($_SESSION['plugin_alpreport_csrf'] ?? '');
+        if (
+            $expectedToken === ''
+            || $submittedToken === ''
+            || !hash_equals($expectedToken, $submittedToken)
+        ) {
+            throw new RuntimeException('Invalid or expired security token. Please reload the page and try again.');
+        }
+
+        $toDelete = trim((string)$_GET['delete_template']);
+        if ($toDelete === '') {
+            throw new RuntimeException('No template selected for deletion.');
+        }
+
+        PluginAlpreportTemplateProcessor::deleteTemplate($toDelete);
+        $_SESSION['plugin_alpreport_csrf'] = bin2hex(random_bytes(32));
+
+        $redirectUrl = $formUrl . '?deleted_template=' . rawurlencode(basename($toDelete));
+        header('Location: ' . $redirectUrl);
+        exit;
+    } catch (Throwable $e) {
+        $errorMessage = $e->getMessage();
+        if (class_exists('Toolbox') && method_exists('Toolbox', 'logInFile')) {
+            Toolbox::logInFile(
+                'alpreport',
+                $e->getMessage() . "\n" . $e->getTraceAsString(),
+                true
+            );
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -55,17 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('Invalid or expired security token. Please reload the page and try again.');
         }
 
-        // Delete-template action (separate flow from generate).
-        $action = (string)($_POST['alpreport_action'] ?? 'generate');
-        if ($action === 'delete_template') {
-            $toDelete = trim((string)($_POST['existing_template'] ?? ''));
-            if ($toDelete === '') {
-                throw new RuntimeException('No template selected for deletion.');
-            }
-            PluginAlpreportTemplateProcessor::deleteTemplate($toDelete);
-            $infoMessage = 'Template deleted: ' . basename($toDelete);
-        } else {
-            $itemType = $_POST['itemtype'] ?? 'Computer';
+        $itemType = $_POST['itemtype'] ?? 'Computer';
         $itemId = (int)($_POST['items_id'] ?? 0);
         if ($itemId <= 0) {
             throw new RuntimeException('Please pick an asset.');
@@ -140,8 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         exit;
-
-        } // end else (generate)
     } catch (Throwable $e) {
         $errorMessage = $e->getMessage();
         if (class_exists('Toolbox') && method_exists('Toolbox', 'logInFile')) {
@@ -177,9 +208,6 @@ echo "<form method='post' enctype='multipart/form-data' class='tab_cadre_fixe' s
 
 // Plugin-scoped CSRF token (kept in a dedicated session slot to avoid being evicted
 // by GLPI's shared token store, which is heavily churned by widgets and AJAX dropdowns).
-if (empty($_SESSION['plugin_alpreport_csrf'])) {
-    $_SESSION['plugin_alpreport_csrf'] = bin2hex(random_bytes(32));
-}
 $alpreportCsrfToken = $_SESSION['plugin_alpreport_csrf'];
 echo "<input type='hidden' name='_alpreport_token' value='" . htmlspecialchars($alpreportCsrfToken, ENT_QUOTES) . "'>";
 
@@ -279,13 +307,19 @@ if (empty($templates)) {
         echo "<input type='radio' id='$rowId' name='existing_template' value='$tplEsc'"
             . ($idx === 0 ? "" : "") . ">";
         echo "<span style='flex:1;font-family:monospace;font-size:0.95em;'>" . htmlspecialchars($template) . "</span>";
-        echo "<button type='submit' name='alpreport_action' value='delete_template' "
+        $deleteUrl = htmlspecialchars(
+            $formUrl
+                . '?delete_template=' . rawurlencode($template)
+                . '&_alpreport_token=' . rawurlencode($alpreportCsrfToken),
+            ENT_QUOTES
+        );
+        echo "<a href='$deleteUrl' "
             . "title='Delete this template' "
-            . "onclick=\"this.form.querySelector('#$rowId').checked=true;"
-            . "return confirm('Delete template \\'" . addslashes($template) . "\\'?');\" "
+            . "onclick=\"return confirm('Delete template \\'" . addslashes($template) . "\\'?');\" "
             . "style='background:#fff;border:1px solid #c00;color:#c00;border-radius:50%;"
-            . "width:22px;height:22px;line-height:18px;padding:0;font-weight:bold;cursor:pointer;'>"
-            . "&times;</button>";
+            . "width:22px;height:22px;line-height:18px;padding:0;font-weight:bold;cursor:pointer;"
+            . "display:inline-flex;align-items:center;justify-content:center;text-decoration:none;'>"
+            . "&times;</a>";
         echo "</label>";
     }
     echo "</div>";
