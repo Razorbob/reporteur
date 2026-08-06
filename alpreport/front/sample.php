@@ -96,8 +96,6 @@ $lines = [
     ['kv', 'Generic:',             '{{components_generic}}'],
     ['kv', 'Cameras:',             '{{components_camera}}'],
     ['blank'],
-    ['kv', 'All components:', '{{components}}'],
-    ['blank'],
     ['heading', 'Network Ports'],
     ['kv', 'Port count:', '{{network_ports_count}}'],
     ['kv', 'Ports:',      '{{network_ports}}'],

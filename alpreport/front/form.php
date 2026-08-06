@@ -316,7 +316,7 @@ echo "<li><b>Network card columns</b>: {{components_networkcard_manufacturer}}, 
 echo "<li><b>Graphic card columns</b>: {{components_graphiccard_manufacturer}}, {{components_graphiccard_model}}, {{components_graphiccard_memory}}, {{components_graphiccard_interface}}</li>";
 echo "<li><b>Monitor columns</b>: {{monitors_manufacturer}}, {{monitors_model}}, {{monitors_size}}, {{monitors_type}}, {{monitors_serial}} (alias: {{monitors_serial_number}}), {{monitors_count}}</li>";
 echo "<li><b>Component counts</b>: {{components_processor_count}}, {{components_memory_count}}, {{components_harddrive_count}}, {{components_networkcard_count}}</li>";
-echo "<li><b>Tables (auto-generated)</b>: {{monitors}}, {{components}}, {{network_ports}}, {{software}} (for backward compatibility)</li>";
+echo "<li><b>General tables</b>: {{network_ports}}, {{software}}, {{rack_items}}</li>";
 echo "<li><b>Any DB field</b>: {{field_<columnname>}} (e.g. {{field_contact}})</li>";
 echo "<li><b>Any FK</b>: {{hardware_<fieldname>_id}} or {{hardware_<fieldname>}} (resolved name)</li>";
 echo "<li><b>Misc</b>: {{generated_at}}</li>";

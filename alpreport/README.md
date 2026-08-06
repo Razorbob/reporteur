@@ -104,8 +104,6 @@ You can also click **Download sample template** on the form page to get a ready-
 
 ### Components
 
-`{{components}}` â€” flat summary of every device type and its items.
-
 For each device type you also get three placeholders:
 
 - `{{components_<type>}}` â€” list of items, e.g. `Intel i7 (serial=ABC, frequency=3200)`
@@ -148,7 +146,6 @@ paragraph** with a real Word table (with header row and borders):
 
 | Placeholder         | Columns                                                  |
 | ------------------- | -------------------------------------------------------- |
-| `{{components}}`    | Type, Name, Manufacturer, Serial, Inventory #            |
 | `{{software}}`      | Software, Version, License Serial                        |
 | `{{network_ports}}` | #, Name, Type, MAC, IP, VLAN                             |
 | `{{rack_items}}`    | Position, Orientation, Type, Name, Location              |
@@ -171,4 +168,3 @@ uploading a `.docx` file via the form.
 
 Other itemtypes can be added by extending `SUPPORTED_ITEMTYPES` in
 `inc/templateprocessor.class.php`.
-
