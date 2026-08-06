@@ -114,6 +114,10 @@ Available types: `processor`, `memory`, `harddrive`, `networkcard`, `graphiccard
 `soundcard`, `motherboard`, `powersupply`, `drive`, `control`, `case`, `pci`,
 `simcard`, `sensor`, `battery`, `firmware`, `generic`, `camera`.
 
+Graphic card row tables also support `{{components_graphiccard_comment}}`. In this
+plugin, use the GLPI graphic card `comment` field for the serial-like value because
+GLPI does not provide a dedicated graphic card serial field in the template data.
+
 ### Software inventory *(via `glpi_items_softwareversions`, when available for the asset type)*
 
 - `{{software}}` â€” pipe-separated list of `Name Version [SN: serial]`

@@ -199,11 +199,14 @@ INSERT IGNORE INTO glpi_devicegraphiccardmodels (id, name) VALUES
 
 -- Device Graphics Cards
 INSERT IGNORE INTO glpi_devicegraphiccards (
-    id, designation, manufacturers_id, devicegraphiccardmodels_id,
+    id, designation, comment, manufacturers_id, devicegraphiccardmodels_id,
     memory_default, entities_id
 ) VALUES
-(200, 'NVIDIA GeForce GTX 1650 4GB', 205, 200, 4096, @entity_id),
-(201, 'NVIDIA Quadro P620 2GB', 205, 201, 2048, @entity_id);
+(200, 'NVIDIA GeForce GTX 1650 4GB', 'GPU-SN-200', 205, 200, 4096, @entity_id),
+(201, 'NVIDIA Quadro P620 2GB', 'GPU-SN-201', 205, 201, 2048, @entity_id);
+
+UPDATE glpi_devicegraphiccards SET comment = 'GPU-SN-200' WHERE id = 200;
+UPDATE glpi_devicegraphiccards SET comment = 'GPU-SN-201' WHERE id = 201;
 
 -- Device Network Card Models
 INSERT IGNORE INTO glpi_devicenetworkcardmodels (id, name) VALUES

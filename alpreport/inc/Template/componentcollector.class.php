@@ -72,16 +72,26 @@ class PluginAlpreportComponentCollector
                     $name = Dropdown::getDropdownName($deviceTable, $deviceId);
                     $name = ($name && $name !== '&nbsp;') ? trim(strip_tags($name)) : ('#' . $deviceId);
 
-                    $serial = (string)($linkRow['serial'] ?? '');
-                    $otherserial = (string)($linkRow['otherserial'] ?? '');
                     $devRow = self::deviceRow($DB, $deviceTable, $deviceId);
+                    $serial = self::resolveComponentSerial($deviceType, $linkRow, $devRow);
+                    $comment = $deviceType === 'DeviceGraphicCard'
+                        ? self::resolveGraphicCardComment($linkRow, $devRow)
+                        : '';
+                    $otherserial = trim((string)($linkRow['otherserial'] ?? ''));
                     $manufacturer = self::manufacturer($devRow);
                     $frequency = self::resolveComponentFrequency($linkRow, $devRow);
 
                     $extras = [];
-                    foreach (['serial', 'otherserial', 'busID', 'capacity'] as $extraKey) {
-                        if (!empty($linkRow[$extraKey])) {
-                            $extras[] = $extraKey . '=' . $linkRow[$extraKey];
+                    if ($serial !== '') {
+                        $extras[] = 'serial=' . $serial;
+                    }
+                    if ($otherserial !== '') {
+                        $extras[] = 'otherserial=' . $otherserial;
+                    }
+                    foreach (['busID', 'capacity'] as $extraKey) {
+                        $extraValue = trim((string)($linkRow[$extraKey] ?? ''));
+                        if ($extraValue !== '') {
+                            $extras[] = $extraKey . '=' . $extraValue;
                         }
                     }
                     if ($frequency !== '') {
@@ -103,6 +113,7 @@ class PluginAlpreportComponentCollector
                         'name'         => $name,
                         'manufacturer' => $manufacturer,
                         'serial'       => $serial,
+                        'comment'      => $comment,
                         'otherserial'  => $otherserial,
                         'capacity'     => (string)($linkRow['capacity'] ?? ''),
                         'frequency'    => $frequency,
@@ -173,6 +184,34 @@ class PluginAlpreportComponentCollector
 
         $mname = Dropdown::getDropdownName('glpi_manufacturers', (int)$devRow['manufacturers_id']);
         return ($mname && $mname !== '&nbsp;') ? trim(strip_tags($mname)) : '';
+    }
+
+    private static function resolveComponentSerial(string $deviceType, array $linkRow, ?array $devRow): string
+    {
+        if ($deviceType === 'DeviceGraphicCard') {
+            return '';
+        }
+
+        $serial = trim((string)($linkRow['serial'] ?? ''));
+        if ($serial !== '') {
+            return $serial;
+        }
+
+        return '';
+    }
+
+    private static function resolveGraphicCardComment(array $linkRow, ?array $devRow): string
+    {
+        foreach ([$linkRow, is_array($devRow) ? $devRow : []] as $row) {
+            foreach (['comment', 'comments'] as $commentField) {
+                $comment = trim(strip_tags((string)($row[$commentField] ?? '')));
+                if ($comment !== '') {
+                    return $comment;
+                }
+            }
+        }
+
+        return '';
     }
 
     private static function addProcessorColumns(array &$row, array $linkRow, ?array $devRow, string $name): void
