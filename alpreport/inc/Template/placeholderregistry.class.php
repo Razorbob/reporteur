@@ -68,7 +68,7 @@ class PluginAlpreportPlaceholderRegistry
             'components_harddrive' => ['manufacturer', 'model', 'size', 'type'],
             'components_networkcard' => ['manufacturer', 'model', 'mac', 'flow'],
             'components_graphiccard' => ['manufacturer', 'model', 'memory', 'interface', 'comment'],
-            'monitors' => ['manufacturer', 'model', 'size', 'type', 'serial', 'serial_number', 'serila_number'],
+            'monitors' => ['manufacturer', 'model', 'size', 'type', 'serial', 'serial_number'],
         ];
     }
 

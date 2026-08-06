@@ -88,7 +88,6 @@ class PluginAlpreportMonitorCollector
                     'size'          => $size,
                     'serial'        => $serial,
                     'serial_number' => $serial,
-                    'serila_number' => $serial,
                     'otherserial'   => trim((string)($row['otherserial'] ?? '')),
                     'comment'       => trim((string)($row['comment'] ?? '')),
                 ];
