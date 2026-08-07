@@ -23,6 +23,7 @@ class PluginAlpreportPlainTextPlaceholderBuilder
         $map['{{asset_type}}']          = $item::getTypeName(1);
         $map['{{asset_id}}']            = (string)($fields['id'] ?? '');
         $map['{{asset_name}}']          = (string)($fields['name'] ?? '');
+        $map['{{asset_hostname}}']      = (string)($fields['hostname'] ?? '');
         $map['{{asset_serial}}']        = (string)($fields['serial'] ?? '');
         $map['{{asset_otherserial}}']   = (string)($fields['otherserial'] ?? '');
         $map['{{asset_comment}}']       = (string)($fields['comment'] ?? '');
@@ -166,8 +167,9 @@ class PluginAlpreportPlainTextPlaceholderBuilder
      */
     private static function addCollectedPlaceholders(array &$map, PluginAlpreportTemplateData $data): void
     {
-        $map['{{asset_ip}}']  = $data->primaryNetwork['ip'] ?? '';
-        $map['{{asset_mac}}'] = $data->primaryNetwork['mac'] ?? '';
+        $map['{{asset_hostname}}'] = $data->primaryNetwork['hostname'] ?? '';
+        $map['{{asset_ip}}']       = $data->primaryNetwork['ip'] ?? '';
+        $map['{{asset_mac}}']      = $data->primaryNetwork['mac'] ?? '';
 
         $os = $data->operatingSystem;
         if (($os['name'] ?? '') !== '') {

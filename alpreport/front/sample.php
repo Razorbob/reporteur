@@ -36,6 +36,7 @@ $lines = [
     ['heading', 'Asset Information Sheet'],
     ['kv', 'Asset type:',     '{{asset_type}}'],
     ['kv', 'Name:',           '{{asset_name}}'],
+    ['kv', 'Hostname:',       '{{asset_hostname}}'],
     ['kv', 'ID:',             '{{asset_id}}'],
     ['kv', 'Serial:',         '{{asset_serial}}'],
     ['kv', 'Inventory #:',    '{{asset_otherserial}}'],

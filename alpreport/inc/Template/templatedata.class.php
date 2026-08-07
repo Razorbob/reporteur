@@ -13,8 +13,8 @@ class PluginAlpreportTemplateData
     /** @var array{lines:string[],rows:array<int,array<string,string>>} */
     public array $networkPorts = ['lines' => [], 'rows' => []];
 
-    /** @var array{ip:string,mac:string} */
-    public array $primaryNetwork = ['ip' => '', 'mac' => ''];
+    /** @var array{hostname:string,ip:string,mac:string} */
+    public array $primaryNetwork = ['hostname' => '', 'ip' => '', 'mac' => ''];
 
     /** @var array<int,array{name:string,version:string,serial:string}> */
     public array $software = [];

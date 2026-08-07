@@ -38,7 +38,7 @@ class PluginAlpreportPlaceholderRegistry
     public static function scalarPlaceholders(): array
     {
         return [
-            'asset_type', 'asset_id', 'asset_name', 'asset_serial', 'asset_otherserial',
+            'asset_type', 'asset_id', 'asset_name', 'asset_hostname', 'asset_serial', 'asset_otherserial',
             'asset_comment', 'asset_contact', 'asset_contact_num', 'asset_uuid',
             'asset_date_mod', 'asset_date_creation', 'generated_at',
             'asset_location', 'asset_state', 'asset_manufacturer', 'asset_model',

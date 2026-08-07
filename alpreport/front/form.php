@@ -339,7 +339,7 @@ echo "</form>";
 echo "<div style='max-width:820px;margin:14px auto;text-align:left;'>";
 echo "<h3>Available placeholders (v2 template)</h3>";
 echo "<ul>";
-echo "<li><b>Asset</b>: {{asset_name}}, {{asset_serial}}, {{asset_otherserial}}, {{asset_uuid}}, {{asset_comment}}, {{asset_contact}}, {{asset_contact_num}}, {{asset_date_creation}}, {{asset_date_mod}}</li>";
+echo "<li><b>Asset</b>: {{asset_name}}, {{asset_hostname}}, {{asset_serial}}, {{asset_otherserial}}, {{asset_uuid}}, {{asset_comment}}, {{asset_contact}}, {{asset_contact_num}}, {{asset_date_creation}}, {{asset_date_mod}}</li>";
 echo "<li><b>Resolved dropdowns</b>: {{asset_location}}, {{asset_state}}, {{asset_manufacturer}}, {{asset_model}}, {{asset_type}}, {{asset_os}}, {{asset_group}}, {{asset_entity}}, {{asset_domain}}, {{asset_network}}</li>";
 echo "<li><b>User</b>: {{asset_user_name}}, {{asset_user_login}}, {{asset_user_realname}}, {{asset_user_email}}, {{asset_user_phone}}</li>";
 echo "<li><b>Network</b>: {{asset_ip}}, {{asset_mac}}</li>";

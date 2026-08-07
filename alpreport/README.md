@@ -31,6 +31,7 @@ You can also click **Download sample template** on the form page to get a ready-
 | `{{asset_type}}` | itemtype display name |
 | `{{asset_id}}` | item id |
 | `{{asset_name}}` | name |
+| `{{asset_hostname}}` | first `glpi_networknames.name` associated with the asset |
 | `{{asset_serial}}` | serial |
 | `{{asset_otherserial}}` | inventory number |
 | `{{asset_uuid}}` | uuid |

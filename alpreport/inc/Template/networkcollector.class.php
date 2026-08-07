@@ -3,13 +3,13 @@
 class PluginAlpreportNetworkCollector
 {
     /**
-     * @return array{ip:string,mac:string}
+     * @return array{hostname:string,ip:string,mac:string}
      */
     public static function collectPrimaryNetwork(CommonDBTM $item): array
     {
         global $DB;
 
-        $result = ['ip' => '', 'mac' => ''];
+        $result = ['hostname' => '', 'ip' => '', 'mac' => ''];
 
         if (!isset($DB) || !($DB instanceof DBmysql)) {
             return $result;
@@ -25,6 +25,7 @@ class PluginAlpreportNetworkCollector
                 'WHERE'  => [
                     'itemtype' => $itemtype,
                     'items_id' => $id,
+                    'is_deleted' => 0,
                 ],
                 'ORDER' => 'id ASC',
                 'LIMIT' => 1,
@@ -33,27 +34,36 @@ class PluginAlpreportNetworkCollector
             foreach ($portIter as $portRow) {
                 $result['mac'] = (string)($portRow['mac'] ?? '');
 
-                $ipIter = $DB->request([
-                    'SELECT' => ['glpi_ipaddresses.name AS ip'],
-                    'FROM'   => 'glpi_ipaddresses',
-                    'INNER JOIN' => [
-                        'glpi_networknames' => [
-                            'ON' => [
-                                'glpi_ipaddresses' => 'items_id',
-                                'glpi_networknames' => 'id',
-                                ['AND' => ['glpi_ipaddresses.itemtype' => 'NetworkName']],
-                            ],
-                        ],
+                $networkNameIter = $DB->request([
+                    'SELECT' => ['id', 'name'],
+                    'FROM'   => 'glpi_networknames',
+                    'WHERE'  => [
+                        'itemtype' => 'NetworkPort',
+                        'items_id' => (int)$portRow['id'],
+                        'is_deleted' => 0,
                     ],
-                    'WHERE' => [
-                        'glpi_networknames.itemtype' => 'NetworkPort',
-                        'glpi_networknames.items_id' => (int)$portRow['id'],
-                    ],
+                    'ORDER' => 'id ASC',
                     'LIMIT' => 1,
                 ]);
 
-                foreach ($ipIter as $ipRow) {
-                    $result['ip'] = (string)($ipRow['ip'] ?? '');
+                foreach ($networkNameIter as $networkNameRow) {
+                    $result['hostname'] = trim((string)($networkNameRow['name'] ?? ''));
+
+                    $ipIter = $DB->request([
+                        'SELECT' => ['name'],
+                        'FROM'   => 'glpi_ipaddresses',
+                        'WHERE'  => [
+                            'itemtype' => 'NetworkName',
+                            'items_id' => (int)$networkNameRow['id'],
+                            'is_deleted' => 0,
+                        ],
+                        'ORDER' => 'id ASC',
+                        'LIMIT' => 1,
+                    ]);
+
+                    foreach ($ipIter as $ipRow) {
+                        $result['ip'] = (string)($ipRow['name'] ?? '');
+                    }
                 }
             }
         } catch (Throwable $e) {
