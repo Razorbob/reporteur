@@ -64,7 +64,7 @@ You can also click **Download sample template** on the form page to get a ready-
 
 ### Group / domain *(via pivot tables)*
 
-- `{{asset_group}}` â€” comma-separated list from `glpi_groups_items` plus `groups_id` / `groups_id_tech`
+- `{{asset_group}}` â€” first group from `glpi_groups_items` plus `groups_id` / `groups_id_tech`
 - `{{asset_domain}}` â€” comma-separated list from `glpi_domains_items` plus `domains_id`
 
 ### Assigned user *(when `users_id` is set)*

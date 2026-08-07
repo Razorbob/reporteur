@@ -76,9 +76,10 @@ class PluginAlpreportAssetMetadataCollector
                         'itemtype' => $item::getType(),
                         'items_id' => (int)$item->getID(),
                     ],
+                    'ORDER' => 'id ASC',
                 ]);
                 foreach ($iter as $row) {
-                    $resolved = $resolveForeignKey('groups_id', (int)$row['groups_id']);
+                    $resolved = self::resolveGroupName((int)$row['groups_id'], $resolveForeignKey);
                     if ($resolved !== null) {
                         $names[] = $resolved;
                     }
@@ -90,7 +91,7 @@ class PluginAlpreportAssetMetadataCollector
 
         foreach (['groups_id', 'groups_id_tech'] as $fieldKey) {
             if (!empty($item->fields[$fieldKey]) && is_numeric($item->fields[$fieldKey])) {
-                $resolved = $resolveForeignKey('groups_id', (int)$item->fields[$fieldKey]);
+                $resolved = self::resolveGroupName((int)$item->fields[$fieldKey], $resolveForeignKey);
                 if ($resolved !== null && !in_array($resolved, $names, true)) {
                     $names[] = $resolved;
                 }
@@ -98,6 +99,20 @@ class PluginAlpreportAssetMetadataCollector
         }
 
         return $names;
+    }
+
+    /**
+     * @param callable(string,int):(?string) $resolveForeignKey
+     */
+    private static function resolveGroupName(int $id, callable $resolveForeignKey): ?string
+    {
+        $resolved = $resolveForeignKey('groups_id', $id);
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        $name = Dropdown::getDropdownName('glpi_groups', $id);
+        return ($name && $name !== '&nbsp;') ? trim(strip_tags($name)) : null;
     }
 
     /**

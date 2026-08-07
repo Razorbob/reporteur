@@ -112,6 +112,7 @@ class PluginAlpreportPlainTextPlaceholderBuilder
             'manufacturer' => 'glpi_manufacturers',
             'model'        => 'glpi_computermodels',
             'type'         => 'glpi_computertypes',
+            'group'        => 'glpi_groups',
             'entity'       => 'glpi_entities',
             'network'      => 'glpi_networks',
             'domain'       => 'glpi_domains',
@@ -181,7 +182,7 @@ class PluginAlpreportPlainTextPlaceholderBuilder
         }
 
         if (!empty($data->groups)) {
-            $map['{{asset_group}}'] = implode(', ', $data->groups);
+            $map['{{asset_group}}'] = $data->groups[0];
         }
         if (!empty($data->domains)) {
             $map['{{asset_domain}}'] = implode(', ', $data->domains);

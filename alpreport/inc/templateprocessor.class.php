@@ -243,6 +243,30 @@ class PluginAlpreportTemplateProcessor
      */
     private static function normalizeXml($xml)
     {
+        // A placeholder may be entered as a Word field result. Word refreshes
+        // fields when the document opens and would overwrite the rendered value.
+        $fieldPattern =
+            '/(<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b[^>]*w:fldCharType="begin"[^>]*(?:\/>|>.*?<\/w:fldChar>)(?:(?!<\/w:r>).)*?<\/w:r>)'
+            . '(.*?)'
+            . '(<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b[^>]*w:fldCharType="separate"[^>]*(?:\/>|>.*?<\/w:fldChar>)(?:(?!<\/w:r>).)*?<\/w:r>)'
+            . '(.*?)'
+            . '(<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b[^>]*w:fldCharType="end"[^>]*(?:\/>|>.*?<\/w:fldChar>)(?:(?!<\/w:r>).)*?<\/w:r>)/su';
+        $xml = preg_replace_callback(
+            '/<w:p\b[^>]*>.*?<\/w:p>/su',
+            static function (array $paragraphMatch) use ($fieldPattern): string {
+                return preg_replace_callback(
+                    $fieldPattern,
+                    static function (array $fieldMatch): string {
+                        return preg_match('/\{\{.*?\}\}/su', $fieldMatch[4]) === 1
+                            ? $fieldMatch[4]
+                            : $fieldMatch[0];
+                    },
+                    $paragraphMatch[0]
+                );
+            },
+            $xml
+        );
+
         // Fix split placeholders
         $xml = preg_replace_callback(
             '/\{\{[^{}]*?(?:<[^>]+>[^{}]*?)+\}\}/u',
