@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * Menu entry for the Alp Report plugin (registered under Tools / Werkzeuge).
