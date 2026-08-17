@@ -5,6 +5,7 @@ services:
     restart: "unless-stopped"
     volumes:
        - ./alpreport:/var/www/glpi/plugins/alpreport
+       - ./alpimport:/var/www/glpi/plugins/alpimport
     env_file: .env # Pass environment variables from .env file to the container
     depends_on:
       - db
@@ -21,4 +22,3 @@ services:
       MYSQL_DATABASE: ${GLPI_DB_NAME}
       MYSQL_USER: ${GLPI_DB_USER}
       MYSQL_PASSWORD: ${GLPI_DB_PASSWORD}
-

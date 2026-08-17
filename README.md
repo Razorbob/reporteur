@@ -228,12 +228,15 @@ rm -rf mysql/
 
 ## Plugin Setup
 
-The **reporteur/alpreport** plugin is mounted at `./plugins/reporteur/`.
+The plugin repository is mounted at `./plugins/reporteur/` and currently contains:
+
+- `alpreport` (DOCX report generator)
+- `alpimport` (XLSX import boilerplate)
 
 To activate the plugin in GLPI:
 1. Login to GLPI (http://localhost:8088)
 2. Go to **Setup > Plugins**
-3. Find "Alp Report" and click **Install**
+3. Find "Alp Report" or "Alp Import" and click **Install**
 4. Then click **Enable**
 
 ## File Structure
@@ -244,7 +247,7 @@ To activate the plugin in GLPI:
 ├── .env                     # Environment variables (DB credentials)
 ├── mysql/                   # MySQL data directory (created on first run)
 ├── plugins/                 # GLPI plugins directory
-│   └── reporteur/          # Alpreport plugin
+│   └── reporteur/           # Plugin repository (alpreport + alpimport)
 ├── glpi_seed_data.sql      # Seed data for testing
 └── README.md               # This file
 ```
@@ -317,7 +320,7 @@ Default credentials (configured in `.env`):
 
 For issues with:
 - **GLPI:** Check official documentation at https://glpi-project.org/
-- **Alpreport Plugin:** Check plugin-specific documentation
+- **Alpreport/Alpimport Plugins:** Check plugin-specific documentation
 - **Docker/Compose:** Check Docker documentation
 
 ## License
