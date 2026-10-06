@@ -245,11 +245,13 @@ class PluginAlpreportTemplateProcessor
     {
         // A placeholder may be entered as a Word field result. Word refreshes
         // fields when the document opens and would overwrite the rendered value.
+        // Nested fields (e.g. TOC with PAGEREF) must not be unwrapped: that would unbalance fldChar pairs.
+        $noFieldRun = '(?:(?!<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b).)*?';
         $fieldPattern =
             '/(<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b[^>]*w:fldCharType="begin"[^>]*(?:\/>|>.*?<\/w:fldChar>)(?:(?!<\/w:r>).)*?<\/w:r>)'
-            . '(.*?)'
+            . '(' . $noFieldRun . ')'
             . '(<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b[^>]*w:fldCharType="separate"[^>]*(?:\/>|>.*?<\/w:fldChar>)(?:(?!<\/w:r>).)*?<\/w:r>)'
-            . '(.*?)'
+            . '(' . $noFieldRun . ')'
             . '(<w:r\b[^>]*>(?:(?!<\/w:r>).)*?<w:fldChar\b[^>]*w:fldCharType="end"[^>]*(?:\/>|>.*?<\/w:fldChar>)(?:(?!<\/w:r>).)*?<\/w:r>)/su';
         $xml = preg_replace_callback(
             '/<w:p\b[^>]*>.*?<\/w:p>/su',

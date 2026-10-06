@@ -18,7 +18,16 @@ class PluginAlpreportXmlRowTableRenderer
             static function (array $m) use ($componentRowData): string {
                 $rowXml = $m[0];
 
-                if (!preg_match_all('/\{\{(?:(components_[a-z0-9]+|monitors|network_ports)_([a-z0-9_]+)|(printer_ports)(?:_([a-z0-9_]+))?)\}\}/i', $rowXml, $phMatches, PREG_SET_ORDER)) {
+                // Card columns may be written as components_networkcard_* inside a combined card/ports row.
+                if (stripos($rowXml, '{{networkcard_ports_') !== false) {
+                    $rowXml = preg_replace(
+                        '/\{\{components_networkcard_(manufacturer|model|flow|mac)\}\}/i',
+                        '{{networkcard_ports_$1}}',
+                        $rowXml
+                    );
+                }
+
+                if (!preg_match_all('/\{\{(?:(components_[a-z0-9]+|monitors|network_ports|networkcard_ports)_([a-z0-9_]+)|(printer_ports)(?:_([a-z0-9_]+))?)\}\}/i', $rowXml, $phMatches, PREG_SET_ORDER)) {
                     return $rowXml;
                 }
 
@@ -45,6 +54,7 @@ class PluginAlpreportXmlRowTableRenderer
                                 $column = 'ports';
                             }
                             $value = (string)($itemRow[$column] ?? '');
+                            $value = preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $value) ?? '';
                             return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
                         },
                         $rowXml

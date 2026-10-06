@@ -64,13 +64,13 @@ class PluginAlpreportXmlBlockTableRenderer
             . '<w:tblLayout w:type="fixed"/>'
             . '<w:tblCellMar>'
             . '<w:top w:w="0" w:type="dxa"/>'
-            . '<w:start w:w="71" w:type="dxa"/>'
+            . '<w:left w:w="71" w:type="dxa"/>'
             . '<w:bottom w:w="0" w:type="dxa"/>'
-            . '<w:end w:w="71" w:type="dxa"/>'
+            . '<w:right w:w="71" w:type="dxa"/>'
             . '</w:tblCellMar>'
             . '</w:tblPr>';
 
-        $tblGrid = '<w:tblGrid>' . str_repeat('<w:gridCol/>', $colCount) . '</w:tblGrid>';
+        $tblGrid = '<w:tblGrid>' . str_repeat('<w:gridCol w:w="' . (int)floor(9216 / $colCount) . '"/>', $colCount) . '</w:tblGrid>';
 
         $baseInner = '';
         if ($rPrXml !== '' && preg_match('/<w:rPr\b[^>]*>(.*?)<\/w:rPr>/s', $rPrXml, $m)) {
@@ -87,7 +87,11 @@ class PluginAlpreportXmlBlockTableRenderer
         $headerRPr = '<w:rPr>' . $headerInner . '</w:rPr>';
 
         $renderCell = static function (string $text, string $cellRPr, bool $isHeader): string {
-            $escaped = htmlspecialchars($text, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+            $escaped = htmlspecialchars(
+                preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $text) ?? '',
+                ENT_XML1 | ENT_COMPAT,
+                'UTF-8'
+            );
             if (strpos($escaped, "\n") !== false) {
                 $escaped = str_replace(
                     ["\r\n", "\n"],
@@ -98,9 +102,9 @@ class PluginAlpreportXmlBlockTableRenderer
 
             $borders = '<w:tcBorders>'
                 . '<w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
-                . '<w:start w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+                . '<w:left w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
                 . '<w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
-                . '<w:end w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+                . '<w:right w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
                 . '</w:tcBorders>';
 
             $shading = $isHeader

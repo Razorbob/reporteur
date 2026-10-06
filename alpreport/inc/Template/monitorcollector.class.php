@@ -51,6 +51,8 @@ class PluginAlpreportMonitorCollector
                     'glpi_assets_assets_peripheralassets.items_id_asset'      => (int)$item->getID(),
                     'glpi_assets_assets_peripheralassets.itemtype_peripheral' => 'Monitor',
                     'glpi_assets_assets_peripheralassets.is_deleted'          => 0,
+                    'glpi_monitors.is_deleted'                                => 0,
+                    'glpi_monitors.is_template'                               => 0,
                 ],
                 'ORDER' => 'glpi_monitors.name ASC',
             ]);

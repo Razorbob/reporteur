@@ -118,6 +118,7 @@ class PluginAlpreportComponentCollector
                         'capacity'     => (string)($linkRow['capacity'] ?? ''),
                         'frequency'    => $frequency,
                         'busID'        => (string)($linkRow['busID'] ?? ''),
+                        'link_id'      => (string)($linkRow['id'] ?? ''),
                     ];
 
                     if ($deviceType === 'DeviceProcessor') {
@@ -188,16 +189,12 @@ class PluginAlpreportComponentCollector
 
     private static function resolveComponentSerial(string $deviceType, array $linkRow, ?array $devRow): string
     {
-        if ($deviceType === 'DeviceGraphicCard') {
-            return '';
-        }
-
         $serial = trim((string)($linkRow['serial'] ?? ''));
         if ($serial !== '') {
             return $serial;
         }
 
-        return '';
+        return trim((string)($devRow['serial'] ?? ''));
     }
 
     private static function resolveGraphicCardComment(array $linkRow, ?array $devRow): string

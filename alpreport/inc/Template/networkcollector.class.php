@@ -31,8 +31,22 @@ class PluginAlpreportNetworkCollector
                 'LIMIT' => 1,
             ]);
 
+            $macs = [];
+            $allMacIter = $DB->request([
+                'SELECT' => ['mac'],
+                'FROM'   => 'glpi_networkports',
+                'WHERE'  => ['itemtype' => $itemtype, 'items_id' => $id, 'is_deleted' => 0],
+                'ORDER'  => 'id ASC',
+            ]);
+            foreach ($allMacIter as $macRow) {
+                $mac = trim((string)($macRow['mac'] ?? ''));
+                if ($mac !== '' && !in_array($mac, $macs, true)) {
+                    $macs[] = $mac;
+                }
+            }
+            $result['mac'] = implode(', ', $macs);
+
             foreach ($portIter as $portRow) {
-                $result['mac'] = (string)($portRow['mac'] ?? '');
 
                 $networkNameIter = $DB->request([
                     'SELECT' => ['id', 'name'],
@@ -171,16 +185,18 @@ class PluginAlpreportNetworkCollector
                 }
 
                 $speed = '';
+                $cardLinkId = 0;
                 if ($DB->tableExists('glpi_networkportethernets')) {
                     try {
                         $speedIter = $DB->request([
-                            'SELECT' => ['speed'],
+                            'SELECT' => ['*'],
                             'FROM'   => 'glpi_networkportethernets',
                             'WHERE'  => ['networkports_id' => $portId],
                             'LIMIT'  => 1,
                         ]);
                         foreach ($speedIter as $speedRow) {
                             $speed = trim((string)($speedRow['speed'] ?? ''));
+                            $cardLinkId = (int)($speedRow['items_devicenetworkcards_id'] ?? 0);
                         }
                     } catch (Throwable $e) {
                         // ignore
@@ -219,6 +235,7 @@ class PluginAlpreportNetworkCollector
                     'ip'          => $ip,
                     'vlan'        => $vlan,
                     'speed'       => $speed,
+                    'card_link'   => (string)$cardLinkId,
                 ];
             }
         } catch (Throwable $e) {

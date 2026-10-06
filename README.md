@@ -63,6 +63,10 @@ sleep 60
 
 # Then seed the database
 docker compose exec -T db mysql -uglpi -pglpi glpi < glpi_seed_data.sql
+
+or in Windows
+
+Get-Content .\glpi_seed_data.sql | docker compose exec -T db mysql -uglpi -pglpi glpi
 ```
 
 ## Seed Data Overview
