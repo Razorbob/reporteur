@@ -119,6 +119,8 @@ class PluginAlpreportComponentCollector
                         'frequency'    => $frequency,
                         'busID'        => (string)($linkRow['busID'] ?? ''),
                         'link_id'      => (string)($linkRow['id'] ?? ''),
+                        'id'           => (string)$deviceId,
+                        'busid'        => (string)($linkRow['busID'] ?? ''),
                     ];
 
                     if ($deviceType === 'DeviceProcessor') {

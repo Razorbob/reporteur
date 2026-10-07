@@ -67,7 +67,7 @@ class PluginAlpreportPlaceholderRegistry
             'components_memory' => ['manufacturer', 'model', 'size', 'frequency', 'type'],
             'components_harddrive' => ['manufacturer', 'model', 'size', 'type'],
             'components_networkcard' => ['manufacturer', 'model', 'mac', 'flow'],
-            'components_graphiccard' => ['manufacturer', 'model', 'memory', 'interface', 'comment'],
+            'components_graphiccard' => ['id', 'link_id', 'manufacturer', 'model', 'serial', 'otherserial', 'busid', 'memory', 'interface', 'comment'],
             'network_ports' => ['logical', 'port_number', 'name', 'type', 'mac', 'ip', 'vlan', 'speed'],
             'networkcard_ports' => ['manufacturer', 'model', 'flow', 'mac', 'port_number', 'port_name', 'port_type', 'port_mac', 'port_ip', 'port_vlan', 'port_speed'],
             'printer_ports' => ['available'],
